@@ -1,0 +1,27 @@
+{
+  "name": "campusos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CampusOS — Subject-Agnostic Education Operating System",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "dev:backend": "turbo run dev --filter=@campusos/backend",
+    "dev:web": "turbo run dev --filter=@campusos/web",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
+    "clean": "turbo run clean",
+    "db:migrate": "pnpm --filter @campusos/backend run migration:run",
+    "db:seed": "pnpm --filter @campusos/backend run seed",
+    "prepare": "echo 'husky install'"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}
