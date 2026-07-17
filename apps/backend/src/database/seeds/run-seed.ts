@@ -46,7 +46,7 @@ async function run() {
 
   // Ensure all system roles exist and have correct permissions
   for (const roleName of SYSTEM_ROLES) {
-    let role = await roleRepo.findOne({ where: { name: roleName, organizationId: null } });
+    let role = await roleRepo.findOne({ where: { name: roleName, organizationId: null as any } });
     
     if (!role) {
       role = roleRepo.create({

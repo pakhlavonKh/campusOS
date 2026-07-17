@@ -41,7 +41,7 @@ export class RbacService {
     isSystem?: boolean;
   }): Promise<Role> {
     const existing = await this.roleRepo.findOne({
-      where: { name: data.name, organizationId: data.organizationId || null },
+      where: { name: data.name, organizationId: (data.organizationId || null) as any },
     });
     if (existing) {
       throw new ConflictException(`Role with name ${data.name} already exists.`);

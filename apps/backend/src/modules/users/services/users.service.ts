@@ -47,7 +47,7 @@ export class UsersService {
     await this.findOne(userId); // ensure user exists
 
     const existing = await this.membershipRepo.findOne({
-      where: { userId, organizationId, branchId: branchId || null },
+      where: { userId, organizationId, branchId: (branchId || null) as any },
     });
     if (existing) {
       return existing;

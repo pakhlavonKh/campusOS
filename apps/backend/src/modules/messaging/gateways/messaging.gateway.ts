@@ -65,7 +65,7 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
       socket.join(conversationId);
       this.logger.log(`User ${user.sub} joined room ${conversationId}`);
       return { success: true };
-    } catch (e) {
+    } catch (e: any) {
       return { success: false, error: e.message };
     }
   }
@@ -91,7 +91,7 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
       // Broadcast message to all sockets in the conversation room
       this.server.to(dto.conversationId).emit('newMessage', message);
       return { success: true };
-    } catch (e) {
+    } catch (e: any) {
       return { success: false, error: e.message };
     }
   }

@@ -352,7 +352,7 @@ export class CurriculumVersion extends BaseEntity {
   curriculumId: string;
 
   @Column({ type: 'int' })
-  version: number;
+  declare version: number;
 
   /** Snapshot of the curriculum structure at this version */
   @Column({ type: 'jsonb' })
@@ -457,7 +457,7 @@ export class CourseTemplate extends BaseEntity {
   isPlatformTemplate: boolean;
 
   @Column({ type: 'int', default: 1 })
-  version: number;
+  declare version: number;
 }
 
 /**

@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { GradebookEntry } from '../gradebook/entities/gradebook.entity';
-import { AttendanceRecord } from '../attendance/entities/attendance.entity';
+import { GradebookEntry } from '../../gradebook/entities/gradebook.entity';
+import { AttendanceRecord } from '../../attendance/entities/attendance.entity';
 
 @Injectable()
 export class AnalyticsService {

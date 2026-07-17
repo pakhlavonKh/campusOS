@@ -310,7 +310,7 @@ export class AssessmentService {
     return this.assessmentRepo.save(assessment);
   }
 
-  async createQuestion(dto: Partial<AssessmentQuestion> & { organizationId: string }) {
+  async createAssessmentQuestion(dto: Partial<AssessmentQuestion> & { organizationId: string }) {
     const question = this.legacyQuestionRepo.create(dto);
     return this.legacyQuestionRepo.save(question);
   }

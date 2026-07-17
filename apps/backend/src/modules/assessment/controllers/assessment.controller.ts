@@ -70,7 +70,7 @@ export class AssessmentController {
     @Body() dto: CreateQuestionDto,
     @TenantId() organizationId: string,
   ) {
-    const data = await this.assessmentService.createQuestion({ ...dto, assessmentId, organizationId });
+    const data = await this.assessmentService.createAssessmentQuestion({ ...dto, assessmentId, organizationId });
     return { success: true, data };
   }
 

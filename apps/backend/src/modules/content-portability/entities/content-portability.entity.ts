@@ -110,7 +110,7 @@ export class ContentVersion extends BaseEntity {
   contentId: string;
 
   @Column({ type: 'int' })
-  version: number;
+  declare version: number;
 
   @Column({ type: 'jsonb' })
   snapshot: Record<string, any>;

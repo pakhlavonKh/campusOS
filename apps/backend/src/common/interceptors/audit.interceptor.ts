@@ -76,7 +76,7 @@ export class AuditInterceptor implements NestInterceptor {
         ipAddress: request.ip || request.headers['x-forwarded-for'],
         userAgent: request.headers['user-agent'],
       });
-    } catch (e) {
+    } catch (e: any) {
       this.logger.error(`Failed to log audit event: ${e.message}`);
     }
   }

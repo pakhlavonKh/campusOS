@@ -34,7 +34,7 @@ export class AttendanceService {
       where: {
         organizationId,
         studentId: data.studentId,
-        classId: data.classId || null,
+        classId: (data.classId || null) as any,
         date: data.date,
       },
     });

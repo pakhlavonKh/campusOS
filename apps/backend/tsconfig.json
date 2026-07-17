@@ -5,6 +5,8 @@
     "rootDir": "./src",
     "baseUrl": "./",
     "strictPropertyInitialization": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "paths": {
       "@modules/*": ["src/modules/*"],
       "@common/*": ["src/common/*"],
