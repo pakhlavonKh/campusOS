@@ -2,24 +2,15 @@ import { useState, useEffect } from 'react';
 import {
   Plus,
   Search,
-  Filter,
   MoreHorizontal,
   Users,
-  Clock,
   BookOpen,
 } from 'lucide-react';
 
 import { coursesService, Course } from '../../api/services/courses.service';
 import { useAuthStore } from '../../store/auth.store';
 
-const mockCourses: Course[] = [
-  { id: '1', title: 'Advanced Physics: Quantum Mechanics', subject: 'Physics', format: 'Semester', status: 'published', students: 32, modules: 12, instructor: 'Dr. Sarah Chen', progress: 67 },
-  { id: '2', title: 'Organic Chemistry Fundamentals', subject: 'Chemistry', format: 'Topic-Based', status: 'published', students: 45, modules: 8, instructor: 'Prof. James Wilson', progress: 45 },
-  { id: '3', title: 'Data Structures & Algorithms', subject: 'Computer Science', format: 'Self-Paced', status: 'published', students: 78, modules: 15, instructor: 'Dr. Maya Patel', progress: 82 },
-  { id: '4', title: 'Modern World History', subject: 'History', format: 'Week-Based', status: 'draft', students: 0, modules: 20, instructor: 'Prof. Robert Kim', progress: 0 },
-  { id: '5', title: 'Creative Writing Workshop', subject: 'English', format: 'Instructor-Led', status: 'published', students: 24, modules: 6, instructor: 'Ms. Emma Davis', progress: 90 },
-  { id: '6', title: 'Calculus III: Multivariable', subject: 'Mathematics', format: 'Semester', status: 'published', students: 55, modules: 10, instructor: 'Dr. Alan Brooks', progress: 33 },
-];
+// mockCourses removed because it is unused and does not conform to Course interface
 
 export function CoursesPage() {
   const [searchQuery, setSearchQuery] = useState('');

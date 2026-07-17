@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { authService } from '../../api/services/auth.service';
 import { useAuthStore } from '../../store/auth.store';
 
@@ -23,7 +23,7 @@ export function LoginPage() {
           response.data.accessToken,
           response.data.user,
           response.data.organizationId,
-          response.data.theme
+          response.data.theme as any
         );
         navigate('/dashboard');
       }

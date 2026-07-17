@@ -74,5 +74,5 @@ export const apiClient = async <T>(endpoint: string, options: FetchOptions = {})
 
   // Handle empty responses (e.g. 204 No Content)
   const text = await response.text();
-  return text ? JSON.parse(text) : {};
+  return text ? JSON.parse(text) : ({} as T);
 };

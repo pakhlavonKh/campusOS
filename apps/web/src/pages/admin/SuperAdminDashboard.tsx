@@ -1,4 +1,4 @@
-import { Building2, Users, HardDrive, Activity, ArrowUpRight } from 'lucide-react';
+import { Building2, Users, HardDrive, Activity } from 'lucide-react';
 
 const stats = [
   { title: 'Total Organizations', value: '42', change: '+3 this month', icon: Building2, color: 'purple' },

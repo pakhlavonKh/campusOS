@@ -43,11 +43,11 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set: any, get: any) => ({
-      token: null,
-      user: null,
-      organizationId: null,
-      whiteLabelConfig: null,
-      theme: null,
+      token: null as string | null,
+      user: null as User | null,
+      organizationId: null as string | null,
+      whiteLabelConfig: null as WhiteLabelConfig | null,
+      theme: null as Record<string, string> | null,
 
       setAuth: (token: string, user: User, organizationId: string, config?: WhiteLabelConfig) => {
         const legacyTheme = config?.tokens

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Search, Settings, MoreHorizontal } from 'lucide-react';
+import { Download, Search, Settings } from 'lucide-react';
 
 interface Student {
   id: string;
@@ -139,7 +139,7 @@ export function GradebookPage() {
                         <td key={a.id} style={{ textAlign: 'center', padding: '0' }}>
                           <input
                             type="number"
-                            defaultValue={score !== undefined ? score : ''}
+                            defaultValue={score !== null && score !== undefined ? score : ''}
                             style={{
                               width: '60px',
                               padding: 'var(--space-2)',
