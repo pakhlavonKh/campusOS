@@ -50,6 +50,8 @@
    - 5.23 Automation
    - 5.24 Content Portability
    - 5.25 Marketplace
+   - 5.26 Frontend Theming and Customization
+   - 5.27 Student and Parent Web Portal
 6. Non-Functional Requirements
 7. Business Rules
 8. Domain Model
@@ -75,7 +77,7 @@ This document defines the product and technical requirements for CampusOS, a mul
 
 ### 1.2 Scope
 
-The platform serves education organizations that operate as a single branch or as multi-branch networks. It includes web, desktop, and mobile experiences, with mobile-only access for students and parents. The platform is designed to be domain-agnostic and extensible to any educational discipline without modifying the core architecture.
+The platform serves education organizations that operate as a single branch or as multi-branch networks. It includes web, desktop, and mobile experiences for all roles, including a dedicated web portal for students and parents alongside native mobile apps. The platform is designed to be domain-agnostic and extensible to any educational discipline without modifying the core architecture.
 
 ### 1.3 Definitions
 
@@ -155,12 +157,12 @@ Subscription pricing is per branch, with optional paid modules, usage-based comm
 - **Branch Admin:** Manages a single branch.
 - **Teacher:** Manages classes, content, homework, attendance, exams, grading, and communication.
 - **Assistant Teacher:** A fully configurable role using granular capabilities per organization.
-- **Student:** Mobile-only user focused on learning, submissions, and collaboration.
-- **Parent:** Mobile-only user focused on child progress, communication, and payments where enabled.
+- **Student:** Web and mobile user focused on learning, submissions, and collaboration. Mobile is optimized for daily use (notifications, quick submissions); web offers the same core workflows for desktop/browser use.
+- **Parent:** Web and mobile user focused on child progress, communication, and payments where enabled. Same dual-access rationale as Student.
 
 ### 2.6 Operating Environment
 
-Web and desktop for administrative users. Native mobile apps for iOS and Android. Mobile-only experience for parents and students.
+Web and desktop for administrative, teaching, and staff roles. Native mobile apps for iOS and Android for all roles. A dedicated student/parent web portal provides the same core workflows (homework, grades, attendance, messaging, payments) as the mobile apps for browser/desktop use.
 
 ### 2.7 Design Constraints
 
@@ -900,6 +902,20 @@ Support future content and template distribution between organizations.
 - Revenue sharing for content creators.
 - Quality review process for published content.
 
+### 5.26 Frontend Theming and Customization
+
+Support per-organization visual customization of the client applications without requiring a separate codebase, build, or deployment per tenant, across three tiers:
+
+- **Tier 1 — Token Theming [all tiers].** Organization Admin can configure logo, favicon/app icon, primary/secondary/accent colors, font family (from a supported set), and custom subdomain (`orgname.platform.com`). Applied at runtime via a design-token/theme configuration loaded per organization; no redeploy required.
+- **Tier 2 — Layout Variants [Pro/Chain and above].** Organization Admin can select from a curated set of pre-built layout and dashboard-arrangement variants (e.g., alternate home/dashboard layouts, alternate navigation styles) per branch or organization, still served from the shared codebase via configuration, not custom code.
+- **Tier 3 — Custom Build [Enterprise, dedicated add-on].** For organizations requiring bespoke UI beyond Tiers 1–2, support a dedicated frontend build that consumes the platform's shared UI component library and API SDK as versioned packages, so the customer-specific build still receives core updates and bug fixes without a full fork. This tier carries its own deployment, hosting, and maintenance cost and is priced/scoped as a separate services engagement, not a standard subscription feature.
+
+Custom domain, logo, and color configuration must apply consistently across web, student/parent web portal, and mobile app (app icon and splash screen) surfaces for a given organization.
+
+### 5.27 Student and Parent Web Portal
+
+Provide a dedicated web application for Student and Parent roles, functionally equivalent to the mobile apps for core workflows: dashboard/overview, course and lesson access, homework submission, grades and gradebook view, attendance view, schedule and exam calendar, messaging and announcements, notifications, and payments where enabled. Voice/pronunciation practice (5.22) must work via browser microphone access where the underlying speech provider supports web audio input. Offline support is not required for the web portal (offline behavior remains a mobile-specific requirement per Section 12); the web portal assumes an active connection.
+
 ---
 
 ## 6. Non-Functional Requirements
@@ -1016,6 +1032,7 @@ Provide advanced search across all academic content including courses, lessons, 
 - **Content Portability:** Imported content must pass validation before it is applied. Content versions are immutable once published.
 - **Gamification:** XP and badge awards are logged and auditable. Leaderboard calculations must be consistent and verifiable.
 - **Voice Submissions:** Audio recordings submitted for assessment are immutable. Pronunciation scores are recorded with provider, model version, and scoring parameters.
+- **Frontend Theming:** Tier 1 and Tier 2 theming changes apply immediately at runtime with no deployment. Tier 3 custom builds are a separate, individually contracted engagement and are not covered by standard subscription SLAs.
 
 ---
 
@@ -1023,7 +1040,7 @@ Provide advanced search across all academic content including courses, lessons, 
 
 ### 8.1 Core Entities
 
-Organization, Branch, User, Membership, Role, Permission, Class, Group, Enrollment, ParentLink, Subscription, FeatureFlag, AuditLog.
+Organization, Branch, User, Membership, Role, Permission, Class, Group, Enrollment, ParentLink, Subscription, FeatureFlag, AuditLog, ThemeConfig.
 
 ### 8.2 LMS Entities
 
@@ -1116,22 +1133,22 @@ Use versioned REST endpoints under /api/v1.
 ## 11. UI Requirements
 
 - Provide responsive web interfaces for platform, organization, branch, teacher, and assistant teacher workflows.
-- Provide mobile-first interfaces for parent and student workflows.
+- Provide a dedicated student and parent web portal covering the same core workflows as the mobile apps (dashboard, homework, grades, attendance, schedule, messaging, payments where enabled), in addition to mobile-first interfaces for those roles.
 - Include empty states, loading states, error states, and accessible form behavior.
-- White-label branding must apply to logo, colors, and supported identity surfaces.
+- White-label branding must apply to logo, colors, and supported identity surfaces, applied at runtime per organization without requiring a separate build or code change (see 5.26, Frontend Theming and Customization).
 - Support drag-and-drop interfaces for course structure management, question ordering, and content block arrangement.
 - Assessment interfaces must support all question types with appropriate input controls.
 - Gradebook interfaces must support bulk entry, inline editing, and filtering.
 - Collaboration interfaces must support threaded discussions, reactions, and real-time updates.
-- Gamification elements (badges, XP, streaks) must be visible in student dashboards.
-- Voice recording interfaces must include audio visualization, playback, and re-recording controls.
+- Gamification elements (badges, XP, streaks) must be visible in student dashboards, on both web and mobile.
+- Voice recording interfaces must include audio visualization, playback, and re-recording controls, on both web (browser microphone) and mobile.
 - All interfaces must conform to WCAG 2.1 AA requirements (see section 6.7).
 
 ---
 
 ## 12. Mobile Specification
 
-Mobile apps are required for staff as companion apps and are the primary interface for students and parents.
+Mobile apps are required for staff as companion apps and are the primary day-to-day interface for students and parents, alongside an equivalent web portal (11) for browser/desktop use. Mobile and web share the same backend contracts (2.7) so feature parity is maintained by default; any deliberate mobile-only or web-only feature must be explicitly justified (e.g., offline queueing is mobile-specific by nature).
 
 - Support push notifications, download access for selected content, offline queueing for submissions where feasible, and deep links into lessons, homework, messages, and assessments.
 - Support voice recording and playback for pronunciation practice and speaking assignments.

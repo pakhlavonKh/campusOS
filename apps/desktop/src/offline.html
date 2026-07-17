@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connection Lost | CampusOS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-gradient-start: #0f172a;
+      --bg-gradient-end: #020617;
+      --card-bg: rgba(30, 41, 59, 0.4);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary-color: #6366f1;
+      --primary-glow: rgba(99, 102, 241, 0.3);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(circle at 10% 20%, #1e1b4b 0%, var(--bg-gradient-end) 90%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Ambient background glows */
+    body::before {
+      content: '';
+      position: absolute;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, var(--primary-color) 0%, transparent 70%);
+      top: -100px;
+      right: -100px;
+      opacity: 0.15;
+      filter: blur(80px);
+      pointer-events: none;
+    }
+
+    body::after {
+      content: '';
+      position: absolute;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, #8b5cf6 0%, transparent 70%);
+      bottom: -150px;
+      left: -150px;
+      opacity: 0.12;
+      filter: blur(100px);
+      pointer-events: none;
+    }
+
+    .container {
+      max-width: 460px;
+      width: 90%;
+      padding: 40px 30px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      z-index: 10;
+      animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .icon-wrapper {
+      position: relative;
+      width: 96px;
+      height: 96px;
+      margin: 0 auto 30px;
+      background: rgba(99, 102, 241, 0.1);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
+    .pulse-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 2px solid var(--primary-color);
+      animation: pulse 2s infinite cubic-bezier(0.215, 0.610, 0.355, 1);
+      opacity: 0;
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: scale(0.95);
+        opacity: 0.5;
+      }
+      50% {
+        opacity: 0.3;
+      }
+      100% {
+        transform: scale(1.4);
+        opacity: 0;
+      }
+    }
+
+    .disconnected-icon {
+      color: var(--primary-color);
+      filter: drop-shadow(0 0 8px var(--primary-glow));
+      animation: shake 4s ease-in-out infinite;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: rotate(0deg); }
+      10%, 30%, 50%, 70%, 90% { transform: translateY(-2px); }
+      20%, 40%, 60%, 80% { transform: translateY(2px); }
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      margin-bottom: 32px;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px 28px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #ffffff;
+      background: linear-gradient(135deg, var(--primary-color) 0%, #4f46e5 100%);
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      outline: none;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow: hidden;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+      background: linear-gradient(135deg, #8b5cf6 0%, var(--primary-color) 100%);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+      box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-loader {
+      display: none;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 20px;
+      background: rgba(244, 63, 94, 0.1);
+      color: #f43f5e;
+      border: 1px solid rgba(244, 63, 94, 0.15);
+      margin-bottom: 20px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: #f43f5e;
+      animation: blink 1.5s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon-wrapper">
+      <div class="pulse-ring"></div>
+      <!-- SVG Cloud Off / Disconnect Icon -->
+      <svg class="disconnected-icon" xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 2l20 20M5.782 5.782a7 7 0 0 0 9.9 9.9M22.56 16.51A4 4 0 0 0 19.5 10c-.57-1.87-2.07-3.37-3.94-3.94a4 4 0 0 0-6.56 3.06M2 17h.01M16 21H8.5"/>
+      </svg>
+    </div>
+
+    <div class="status-badge">
+      <div class="status-dot"></div>
+      Offline Mode
+    </div>
+
+    <h1>Unable to Connect</h1>
+    <p>CampusOS could not establish a connection to the application server. Please check your internet connection and click retry.</p>
+
+    <button id="retryBtn" class="btn" onclick="handleRetry()">
+      <span class="btn-loader" id="btnLoader"></span>
+      <span id="btnText">Retry Connection</span>
+    </button>
+  </div>
+
+  <script>
+    function handleRetry() {
+      const btn = document.getElementById('retryBtn');
+      const loader = document.getElementById('btnLoader');
+      const text = document.getElementById('btnText');
+
+      // Add loading state
+      btn.disabled = true;
+      loader.style.display = 'inline-block';
+      text.innerText = 'Checking Connection...';
+
+      // Call the Electron bridge to retry loading
+      setTimeout(() => {
+        if (window.electronAPI && typeof window.electronAPI.retryConnection === 'function') {
+          window.electronAPI.retryConnection();
+        } else {
+          // Fallback if not inside Electron wrapper context
+          window.location.reload();
+        }
+
+        // Reset state after a short delay if reload didn't trigger immediate navigation
+        setTimeout(() => {
+          btn.disabled = false;
+          loader.style.display = 'none';
+          text.innerText = 'Retry Connection';
+        }, 3000);
+      }, 1000);
+    }
+    
+    // Automatically retry if browser detects online event
+    window.addEventListener('online', () => {
+      handleRetry();
+    });
+  </script>
+</body>
+</html>

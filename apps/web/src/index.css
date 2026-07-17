@@ -893,3 +893,31 @@ tr:last-child td {
     gap: var(--space-4);
   }
 }
+
+/* ─── Electron Desktop Custom Styles ─── */
+.is-desktop .topbar {
+  -webkit-app-region: drag;
+}
+
+.is-desktop .topbar-right,
+.is-desktop .topbar-search,
+.is-desktop .btn,
+.is-desktop input,
+.is-desktop a {
+  -webkit-app-region: no-drag;
+}
+
+/* macOS specific adjustments for window traffic lights */
+.is-desktop.is-mac .sidebar {
+  padding-top: 32px;
+}
+
+.is-desktop.is-mac .topbar {
+  padding-top: 32px;
+  height: calc(var(--topbar-height) + 32px);
+}
+
+.is-desktop.is-mac .main-content {
+  padding-top: calc(var(--topbar-height) + 32px);
+}
+

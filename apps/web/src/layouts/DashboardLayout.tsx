@@ -15,6 +15,7 @@ import {
   ShieldAlert,
   Building2,
 } from 'lucide-react';
+import { useAuthStore } from '../store/auth.store';
 
 const navItems = [
   {
@@ -57,6 +58,8 @@ const navItems = [
 
 export function DashboardLayout() {
   const location = useLocation();
+  const whiteLabelConfig = useAuthStore((state: any) => state.whiteLabelConfig);
+  const layoutVariant = whiteLabelConfig?.layoutVariant || 'sidebar';
 
   const getPageTitle = () => {
     const path = location.pathname.split('/')[1];
@@ -72,6 +75,83 @@ export function DashboardLayout() {
     return titles[path] || 'CampusOS';
   };
 
+  const allLinks = navItems.flatMap((section) => section.links);
+
+  if (layoutVariant === 'top_nav') {
+    // ─── TIER 2: TOP NAVIGATION LAYOUT VARIANT ───
+    return (
+      <div className="app-layout" style={{ flexDirection: 'column' }}>
+        {/* Top Navbar */}
+        <header
+          className="topbar"
+          style={{
+            left: 0,
+            padding: '0 var(--space-6)',
+            position: 'sticky',
+            width: '100%',
+          }}
+        >
+          <div className="topbar-left" style={{ gap: 'var(--space-6)' }}>
+            <div className="sidebar-brand" style={{ borderBottom: 'none', padding: 0 }}>
+              <div className="sidebar-brand-icon">C</div>
+              <span className="sidebar-brand-text">CampusOS</span>
+            </div>
+
+            {/* Horizontal Navigation Links */}
+            <nav style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              {allLinks.map((link) => {
+                const Icon = link.icon;
+                return (
+                  <NavLink
+                    key={link.to}
+                    to={link.to}
+                    className={({ isActive }: { isActive: boolean }) =>
+                      `sidebar-link ${isActive ? 'active' : ''}`
+                    }
+                    style={{
+                      padding: 'var(--space-2) var(--space-3)',
+                      height: 'auto',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '0.8125rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-2)',
+                    }}
+                  >
+                    <Icon size={14} />
+                    {link.label}
+                  </NavLink>
+                );
+              })}
+            </nav>
+          </div>
+
+          <div className="topbar-right">
+            <div className="topbar-search">
+              <Search size={16} style={{ color: 'var(--text-tertiary)' }} />
+              <input placeholder="Search..." />
+            </div>
+            <button className="btn btn-ghost btn-icon" title="Notifications">
+              <Bell size={20} />
+            </button>
+            <div className="avatar">A</div>
+            <button className="btn btn-ghost btn-icon" title="Logout" style={{ marginLeft: 'var(--space-2)' }}>
+              <LogOut size={16} />
+            </button>
+          </div>
+        </header>
+
+        {/* Page Content */}
+        <main className="main-content" style={{ marginLeft: 0, paddingTop: 0 }}>
+          <div className="page-content">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // ─── DEFAULT SIDEBAR LAYOUT VARIANT ───
   return (
     <div className="app-layout">
       {/* Sidebar */}
@@ -91,7 +171,7 @@ export function DashboardLayout() {
                   <NavLink
                     key={link.to}
                     to={link.to}
-                    className={({ isActive }) =>
+                    className={({ isActive }: { isActive: boolean }) =>
                       `sidebar-link ${isActive ? 'active' : ''}`
                     }
                   >

@@ -924,7 +924,7 @@ graph TB
 | `Subscription` | Active subscription: plan, start date, renewal date, status |
 | `FeatureFlag` | Feature/module toggle per organization |
 | `ModuleLicense` | Module-specific license with usage limits |
-| `WhiteLabelConfig` | Branding configuration: logo URLs, color palette, fonts, custom domain |
+| `WhiteLabelConfig` | Branding configuration: logo URLs, color palette, fonts, custom domain, theme tier (`token` \| `layout_variant` \| `custom_build`), selected layout variant key, custom build deployment reference (Tier 3 only) |
 | `APIKey` | API keys for webhook consumers and third-party integrations |
 
 **Services:**
@@ -958,6 +958,42 @@ graph TB
 | `OrganizationSuspended` | `{ organizationId, reason }` | Auth (block logins), Notifications, Audit |
 | `OrganizationArchived` | `{ organizationId }` | Data retention, Audit |
 | `SubscriptionChanged` | `{ organizationId, oldPlan, newPlan }` | FeatureFlags, Billing, Notifications |
+
+#### 3.2.3.1 Frontend Theming & Customization Architecture
+
+Per-organization frontend customization (SRS 5.26) is implemented as three tiers, all served from the **same shared codebase** (`apps/web`, `apps/mobile`) except Tier 3. This avoids per-tenant forks/deployments for the vast majority of customers while still allowing deep bespoke UI for large chain customers who pay for it.
+
+**Tier 1 — Token Theming (all tiers, no redeploy):**
+- `WhiteLabelConfig.tokens` stores a flat design-token map (colors, font family, logo/favicon URLs, custom domain) in `organizations.white_label_config` JSONB.
+- On app boot, a `ThemeProvider` fetches the organization's token map (via `WhiteLabelConfigRepository`, Redis-cached) and injects it as CSS custom properties (`--color-primary`, `--font-body`, etc.) at the document root. `packages/ui` primitives consume these CSS variables exclusively — never hardcoded colors — so the same component library re-skins per tenant automatically.
+- Mobile apps read the same token map via the API and apply it to a React Native theme context (React Navigation theme + component style props) plus app icon/splash asset swap at build-time per organization bundle identifier (or a single generic app + in-app organization selection for Starter/Growth tiers that don't warrant a dedicated app store listing).
+
+**Tier 2 — Layout Variants (Pro/Chain and above, no redeploy):**
+- A small, curated set of alternate layout components (e.g., `DashboardLayoutA`, `DashboardLayoutB`, alternate nav placements) ship in the shared codebase behind a `layout_variant` config key.
+- Feature-flag-style resolution (`FeatureFlagService` pattern, §3.2.3) picks the active variant per organization/branch at render time. New variants require an engineering release (they're pre-built), but *assigning* a variant to an organization is a config change, not a deploy.
+
+**Tier 3 — Custom Build (Enterprise, dedicated engagement):**
+- For UI needs beyond Tiers 1–2, the customer gets a dedicated frontend deployment that imports `packages/ui`, `packages/sdk`, and `packages/shared` as versioned private npm packages, rather than forking the app source.
+- This keeps the custom build receiving core component fixes/updates via normal package version bumps, while allowing arbitrary page composition, custom components, and layout beyond what config-driven Tiers 1–2 support.
+- Explicitly **not** supported: arbitrary client-supplied code (JS/CSS) executed inside the shared multi-tenant app. Injecting tenant-authored code into a shared runtime is an XSS/security risk across tenants; Tier 3 exists specifically so bespoke needs get an isolated deployment instead.
+
+**Data shape (`organizations.white_label_config` JSONB):**
+```json
+{
+  "tier": "token" ,
+  "tokens": {
+    "colorPrimary": "#1A56DB",
+    "colorSecondary": "#0F172A",
+    "fontFamily": "Inter",
+    "logoUrl": "https://cdn.../org123/logo.svg",
+    "faviconUrl": "https://cdn.../org123/favicon.ico",
+    "customDomain": "learn.orgname.com"
+  },
+  "layoutVariant": null,
+  "customBuildRef": null
+}
+```
+
 | `FeatureFlagToggled` | `{ organizationId, flag, enabled }` | All modules (cache invalidation) |
 | `ModuleLicenseUpdated` | `{ organizationId, module, limits }` | Affected module |
 
@@ -3839,7 +3875,7 @@ CREATE TABLE organizations (
   status VARCHAR(20) NOT NULL DEFAULT 'active',  -- active, suspended, archived
   billing_plan VARCHAR(50) NOT NULL DEFAULT 'free',
   settings JSONB NOT NULL DEFAULT '{}',
-  white_label_config JSONB NOT NULL DEFAULT '{}',
+  white_label_config JSONB NOT NULL DEFAULT '{}',  -- shape: { tier, tokens{colorPrimary,colorSecondary,fontFamily,logoUrl,faviconUrl,customDomain}, layoutVariant, customBuildRef } — see SDD 3.2.3.1
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   deleted_at TIMESTAMPTZ
@@ -6155,24 +6191,25 @@ campusos/
 │   │   ├── nest-cli.json
 │   │   └── .env.example
 │   │
-│   ├── web/                                 # React web application
+│   ├── web/                                 # React web application — serves all roles (admin/teacher/assistant console + student/parent portal), views resolved by RBAC role at route level
 │   │   ├── src/
 │   │   │   ├── app/
 │   │   │   │   ├── routes/
 │   │   │   │   ├── layouts/
-│   │   │   │   └── providers/
+│   │   │   │   └── providers/               # includes ThemeProvider (org token/layout-variant resolution, see SDD 3.2.3.1)
 │   │   │   ├── features/                    # Feature-based organization
 │   │   │   │   ├── auth/
 │   │   │   │   ├── dashboard/
 │   │   │   │   ├── courses/
 │   │   │   │   ├── assessment/
 │   │   │   │   ├── gradebook/
+│   │   │   │   ├── homework/                # student/parent submission + teacher review views
 │   │   │   │   ├── attendance/
 │   │   │   │   ├── schedule/
 │   │   │   │   ├── messaging/
 │   │   │   │   ├── collaboration/
 │   │   │   │   ├── gamification/
-│   │   │   │   ├── voice/
+│   │   │   │   ├── voice/                   # includes browser-microphone pronunciation practice
 │   │   │   │   ├── crm/
 │   │   │   │   ├── finance/
 │   │   │   │   ├── settings/
@@ -6270,7 +6307,7 @@ campusos/
 │   │   │   ├── composite/
 │   │   │   ├── charts/
 │   │   │   ├── forms/
-│   │   │   └── themes/
+│   │   │   └── themes/                      # Design-token theme definitions consumed via CSS custom properties; org-specific tokens injected at runtime by ThemeProvider (SDD 3.2.3.1), not baked in at build time
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │

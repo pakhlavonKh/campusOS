@@ -11,17 +11,30 @@ import { GradebookPage } from './pages/gradebook/GradebookPage';
 import { DiscussionsPage } from './pages/collaboration/DiscussionsPage';
 import { SuperAdminDashboard } from './pages/admin/SuperAdminDashboard';
 import { OrganizationsPage } from './pages/admin/OrganizationsPage';
+import { useDesktop } from './hooks/useDesktop';
 
-// Mock Theme Switcher for testing Whitelabeling
+// Theme Switcher for testing Tiers 1 & 2 of the Whitelabeling Architecture
 function ThemeSwitcher() {
-  const { theme, setTheme } = useAuthStore();
+  const { whiteLabelConfig, setWhiteLabelConfig } = useAuthStore();
   
   const toggleTheme = () => {
-    if (theme?.primaryColor === '#e11d48') {
-      setTheme({ primaryColor: '#6366f1', secondaryColor: '#4f46e5' });
-    } else {
-      setTheme({ primaryColor: '#e11d48', secondaryColor: '#be123c' });
-    }
+    const isRed = whiteLabelConfig?.tokens?.colorPrimary === '#e11d48';
+    const currentLayout = whiteLabelConfig?.layoutVariant || 'sidebar';
+    const nextLayout = currentLayout === 'sidebar' ? 'top_nav' : 'sidebar';
+
+    setWhiteLabelConfig({
+      tier: 'layout_variant',
+      tokens: {
+        colorPrimary: isRed ? '#6366f1' : '#e11d48',
+        colorSecondary: isRed ? '#4f46e5' : '#be123c',
+        fontFamily: 'Inter',
+        logoUrl: null,
+        faviconUrl: null,
+        customDomain: null,
+      },
+      layoutVariant: nextLayout,
+      customBuildRef: null,
+    });
   };
 
   return (
@@ -36,32 +49,43 @@ function ThemeSwitcher() {
         padding: '10px 16px',
         borderRadius: '20px',
         border: 'none',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
         cursor: 'pointer',
         zIndex: 9999,
         fontWeight: 'bold',
       }}
     >
-      Toggle Theme
+      Toggle Layout & Theme
     </button>
   );
 }
 
 function App() {
-  const theme = useAuthStore((state) => state.theme);
+  const whiteLabelConfig = useAuthStore((state: any) => state.whiteLabelConfig);
+  const { isDesktop, isMac } = useDesktop();
 
   useEffect(() => {
-    if (theme?.primaryColor) {
-      document.documentElement.style.setProperty('--color-primary-500', theme.primaryColor);
+    if (isDesktop) {
+      document.documentElement.classList.add('is-desktop');
+      if (isMac) {
+        document.documentElement.classList.add('is-mac');
+      }
+    }
+  }, [isDesktop, isMac]);
+
+  useEffect(() => {
+    const tokens = whiteLabelConfig?.tokens;
+    if (tokens?.colorPrimary) {
+      document.documentElement.style.setProperty('--color-primary-500', tokens.colorPrimary);
     } else {
       document.documentElement.style.setProperty('--color-primary-500', '#6366f1'); // default
     }
-    if (theme?.secondaryColor) {
-      document.documentElement.style.setProperty('--color-accent-500', theme.secondaryColor);
+    if (tokens?.colorSecondary) {
+      document.documentElement.style.setProperty('--color-accent-500', tokens.colorSecondary);
     } else {
       document.documentElement.style.setProperty('--color-accent-500', '#8b5cf6'); // default
     }
-  }, [theme]);
+  }, [whiteLabelConfig]);
 
   return (
     <>
@@ -92,3 +116,4 @@ function App() {
 }
 
 export default App;
+
