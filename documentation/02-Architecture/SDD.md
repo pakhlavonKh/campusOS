@@ -93,7 +93,7 @@ CampusOS is a **modular monolith** built with NestJS (Node.js/TypeScript) using 
 | Backend framework | NestJS (TypeScript) | Strong DI, modular system, decorator-based, excellent TypeScript support, large ecosystem |
 | Frontend framework | React + TypeScript | Component model, ecosystem, hiring pool, SSR capability via Next.js |
 | Mobile framework | React Native | Code sharing with web, single team skill set, native performance |
-| Desktop framework | Electron (wrapping React web) | Identical codebase to web, no additional framework needed |
+| Desktop framework | Electron, two separate apps: customer-facing (wraps `apps/web`) and Platform Super Admin (separate `apps/admin-desktop`, own codebase and build/release pipeline) | Customer-facing desktop reuses the web codebase for zero extra cost; the Super Admin app is kept fully isolated (no shared bundle, no shared distribution channel) since it carries cross-tenant access — see SDD §3.2.3.2 and SRS 5.28 |
 | Database | PostgreSQL 16+ | JSONB, RLS, partitioning, mature, ACID, extensibility |
 | Cache / Queue | Redis 7+ (with Redis Streams) | In-memory speed, pub/sub, streams for job queues, distributed locks |
 | Object Storage | S3-compatible (AWS S3 / MinIO) | Industry standard, CDN integration, lifecycle policies |
@@ -181,9 +181,10 @@ The architecture supports three scaling phases:
 ```mermaid
 graph TB
     subgraph Clients
-        WEB["React Web App"]
+        WEB["React Web App (staff console + student/parent portal)"]
         MOBILE["React Native Mobile"]
-        DESKTOP["Electron Desktop"]
+        DESKTOP["Electron Desktop (customer-facing, wraps WEB)"]
+        ADMIN_DESKTOP["Electron Desktop — Platform Super Admin (isolated app)"]
         WEBHOOK_CONSUMER["External Webhook Consumers"]
     end
 
@@ -265,6 +266,7 @@ graph TB
     WEB --> CDN
     MOBILE --> LB
     DESKTOP --> LB
+    ADMIN_DESKTOP --> LB
     CDN --> LB
     LB --> Application
 
@@ -993,6 +995,22 @@ Per-organization frontend customization (SRS 5.26) is implemented as three tiers
   "customBuildRef": null
 }
 ```
+
+#### 3.2.3.2 Platform Super Admin Desktop Application (Isolated App)
+
+Per SRS 5.28, the Platform Super Admin app is a **fully separate application**, not a role-gated view inside `apps/web`/`apps/desktop`. Isolation is enforced at every layer, not just the UI:
+
+| Layer | Customer-facing apps | Super Admin app |
+|---|---|---|
+| Codebase | `apps/web`, `apps/mobile`, `apps/desktop` | `apps/admin-desktop` (own repo path, own `package.json`, imports only `packages/shared` and `packages/sdk` — never `apps/web` code) |
+| Build/release pipeline | Public CI/CD, deployed to CDN / app stores / customer-visible download page | Separate CI/CD pipeline, signed internal builds, distributed via internal channel only (e.g., internal artifact registry, MDM) — never linked from the marketing site or customer product |
+| Auth | Standard login, any tenant role | Same `AUTH` module/endpoints, but the app's login flow only accepts tokens carrying the `platform_super_admin` role claim; any other valid token is rejected client-side *and* the corresponding API endpoints are additionally guarded server-side (defense in depth — never trust a client-side role check alone) |
+| MFA | MFA required for privileged tenant roles per policy | MFA mandatory, no exceptions, shorter session TTL, no "remember this device" |
+| API surface | Tenant-scoped endpoints only (`organization_id` derived from membership) | Cross-tenant platform endpoints (`/platform/v1/...`) — a distinct API namespace from tenant-scoped `/api/v1/...`, so the two are never accidentally reachable from the wrong app |
+| Network exposure | Public internet | Recommended: additionally restricted by IP allowlist or VPN at the load balancer/WAF for the `/platform/v1/...` namespace |
+
+This mirrors the Extraction Playbook pattern (§23.2) in spirit — clean interface boundary now, so the Super Admin backend surface could later be split into its own service without touching the tenant-facing product at all.
+
 
 | `FeatureFlagToggled` | `{ organizationId, flag, enabled }` | All modules (cache invalidation) |
 | `ModuleLicenseUpdated` | `{ organizationId, module, limits }` | Affected module |
@@ -5303,6 +5321,14 @@ CREATE TABLE ai_usage_logs (
 
 # 14. Security Architecture
 
+## 14.0 Platform Super Admin Isolation
+
+The `/platform/v1/...` API namespace (consumed exclusively by `apps/admin-desktop`, see §3.2.3.2) is treated as a separate trust boundary from the tenant-facing `/api/v1/...` namespace:
+
+- Server-side guard rejects any request to `/platform/v1/...` unless the JWT carries the `platform_super_admin` role claim — enforced independently of, and in addition to, the client app's own login restriction.
+- Recommended additional network-layer control: IP allowlist or VPN requirement at the WAF/load balancer for the `/platform/v1/...` path, since this traffic only ever originates from a small, known set of internal users.
+- Every impersonation action taken through this surface writes to `AuditLog` with actor, target organization, target user, start/end timestamp, and reason; impersonation audit records are excluded from the standard soft-delete/purge retention policy (§7.4) and are retained indefinitely.
+
 ## 14.1 Authentication Security
 
 ```mermaid
@@ -6263,16 +6289,35 @@ campusos/
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
-│   └── desktop/                             # Electron wrapper
+│   ├── desktop/                              # Electron wrapper — customer-facing, wraps apps/web
+│   │   ├── src/
+│   │   │   ├── main/
+│   │   │   │   ├── main.ts
+│   │   │   │   ├── menu.ts
+│   │   │   │   └── updater.ts
+│   │   │   └── preload/
+│   │   │       └── preload.ts
+│   │   ├── package.json
+│   │   └── electron-builder.yml
+│   │
+│   └── admin-desktop/                        # Electron app — Platform Super Admin ONLY, isolated codebase (SDD 3.2.3.2)
 │       ├── src/
 │       │   ├── main/
-│       │   │   ├── main.ts
+│       │   │   ├── main.ts                   # enforces platform_super_admin-only login at app level
 │       │   │   ├── menu.ts
-│       │   │   └── updater.ts
-│       │   └── preload/
-│       │       └── preload.ts
+│       │   │   └── updater.ts                # separate internal update channel, not public
+│       │   ├── preload/
+│       │   │   └── preload.ts
+│       │   ├── features/                     # tenant-lifecycle, billing, feature-flags, impersonation, usage monitoring, system health
+│       │   │   ├── organizations/
+│       │   │   ├── billing/
+│       │   │   ├── feature-flags/
+│       │   │   ├── impersonation/
+│       │   │   ├── usage-monitoring/
+│       │   │   └── system-health/
+│       │   └── components/                   # imports packages/ui and packages/sdk only — never apps/web source
 │       ├── package.json
-│       └── electron-builder.yml
+│       └── electron-builder.yml               # signed internal build config, private distribution channel
 │
 ├── packages/                                # Shared packages
 │   ├── shared/                              # Shared TypeScript types and utilities

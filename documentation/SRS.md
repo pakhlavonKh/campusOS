@@ -52,6 +52,7 @@
    - 5.25 Marketplace
    - 5.26 Frontend Theming and Customization
    - 5.27 Student and Parent Web Portal
+   - 5.28 Platform Super Admin Desktop Application
 6. Non-Functional Requirements
 7. Business Rules
 8. Domain Model
@@ -152,7 +153,7 @@ Subscription pricing is per branch, with optional paid modules, usage-based comm
 
 ### 2.5 User Classes
 
-- **Platform Super Admin:** Manages all tenants, billing, usage, and support.
+- **Platform Super Admin:** Manages all tenants, billing, usage, and support. Uses a dedicated, internally-distributed desktop application, separate from the customer-facing product (see 5.28).
 - **Organization Owner/Admin:** Manages the organization and all branches.
 - **Branch Admin:** Manages a single branch.
 - **Teacher:** Manages classes, content, homework, attendance, exams, grading, and communication.
@@ -162,7 +163,7 @@ Subscription pricing is per branch, with optional paid modules, usage-based comm
 
 ### 2.6 Operating Environment
 
-Web and desktop for administrative, teaching, and staff roles. Native mobile apps for iOS and Android for all roles. A dedicated student/parent web portal provides the same core workflows (homework, grades, attendance, messaging, payments) as the mobile apps for browser/desktop use.
+Web and desktop for organization/branch administrative, teaching, and staff roles. Native mobile apps for iOS and Android for all roles. A dedicated student/parent web portal provides the same core workflows (homework, grades, attendance, messaging, payments) as the mobile apps for browser/desktop use. Platform Super Admin uses a separate, internally-distributed desktop application, isolated from the customer-facing web/desktop/mobile builds (see 5.28).
 
 ### 2.7 Design Constraints
 
@@ -170,6 +171,7 @@ Web and desktop for administrative, teaching, and staff roles. Native mobile app
 - White-label customization must not require code changes.
 - APIs must be versioned.
 - Mobile and web clients must use the same backend contracts.
+- The Platform Super Admin application must be built and distributed separately from the customer-facing web/desktop/mobile applications; no internal platform-management code may ship inside a customer-facing build.
 - The platform must support fine-grained RBAC and ABAC.
 - Speech and voice providers must be abstracted behind interfaces.
 
@@ -915,6 +917,26 @@ Custom domain, logo, and color configuration must apply consistently across web,
 ### 5.27 Student and Parent Web Portal
 
 Provide a dedicated web application for Student and Parent roles, functionally equivalent to the mobile apps for core workflows: dashboard/overview, course and lesson access, homework submission, grades and gradebook view, attendance view, schedule and exam calendar, messaging and announcements, notifications, and payments where enabled. Voice/pronunciation practice (5.22) must work via browser microphone access where the underlying speech provider supports web audio input. Offline support is not required for the web portal (offline behavior remains a mobile-specific requirement per Section 12); the web portal assumes an active connection.
+
+### 5.28 Platform Super Admin Desktop Application
+
+Provide a dedicated desktop application for the Platform Super Admin role, built and deployed as a **separate application from the customer-facing web/desktop app** used by Organization Admin, Branch Admin, Teacher, and Assistant Teacher roles — not a shared bundle with role-based hiding of admin routes.
+
+Rationale: Platform Super Admin has cross-tenant access (all organizations' data, billing, and support tooling). Bundling that capability into the same build as the customer-facing product increases attack surface (internal routes/code shipped to every customer install) and risks accidental exposure through misconfigured permissions. A separate build keeps internal platform-management code out of any customer-facing artifact entirely.
+
+Functional scope (superadmin capabilities, delivered through this dedicated app):
+- Organization lifecycle management: create, suspend, cancel, archive; trial-to-paid conversion.
+- Subscription/plan and feature-flag management per organization, without requiring a code deploy.
+- Consolidated billing dashboard: MRR, churn, per-branch revenue, failed payments.
+- Usage monitoring per organization (storage, video minutes, SMS/communication credits, AI/speech usage) for abuse detection and upsell signals.
+- Impersonation/support mode with mandatory, non-deletable audit logging of every impersonation session.
+- Global feature flags, maintenance banners, and system health/observability dashboards.
+
+Access and distribution constraints:
+- Distributed only through internal channels (not a public app-store listing and not linked from the customer-facing product or website).
+- Login restricted to users holding the Platform Super Admin role at the backend; valid credentials for any other role must be rejected at this app's login, even if otherwise valid, as defense in depth.
+- Mandatory MFA (not optional) for this application, independent of the general "MFA for privileged roles" baseline in 5.1.
+- Session timeout and re-authentication requirements should be stricter than the customer-facing apps, given the scope of access.
 
 ---
 

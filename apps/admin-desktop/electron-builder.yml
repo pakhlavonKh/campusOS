@@ -1,0 +1,22 @@
+appId: com.campusos.admin-desktop
+productName: CampusOS Platform Admin
+directories:
+  output: release
+files:
+  - dist/**/*
+  - package.json
+win:
+  target:
+    - nsis
+mac:
+  target:
+    - dmg
+  category: public.app-category.developer-tools
+linux:
+  target:
+    - AppImage
+  category: Development
+# Internal private distribution channel configuration (SDD §3.2.3.2)
+publish:
+  provider: generic
+  url: https://internal-registry.campusos.dev/updates/admin-desktop

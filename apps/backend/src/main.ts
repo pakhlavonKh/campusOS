@@ -17,7 +17,9 @@ async function bootstrap() {
   });
 
   // Global prefix
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api/v1', {
+    exclude: ['platform/v1/(.*)'],
+  });
 
   // Validation
   app.useGlobalPipes(

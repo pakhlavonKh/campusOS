@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { BullModule } from '@nestjs/bull';
 
 // Config
@@ -50,6 +50,8 @@ import { AutomationModule } from './modules/automation/automation.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { MarketplaceModule } from './modules/marketplace/marketplace.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { PlatformModule } from './modules/platform/platform.module';
+import { PlatformGuard } from './common/guards/platform.guard';
 
 // Interceptors
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
@@ -111,6 +113,7 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
     OrganizationsModule,
     BranchesModule,
     RbacModule,
+    PlatformModule,
 
     // ─── Academic Layer ───
     LmsModule,
@@ -146,6 +149,10 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
     {
       provide: APP_INTERCEPTOR,
       useClass: AuditInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PlatformGuard,
     },
   ],
 })
