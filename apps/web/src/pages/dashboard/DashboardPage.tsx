@@ -60,23 +60,43 @@ const upcomingSchedule = [
   { title: 'Chemistry Lab', time: '15:30 — 17:00', room: 'Lab 1', status: 'Upcoming' },
 ];
 
+import { useTranslation } from '../../providers/LanguageProvider';
+
 export function DashboardPage() {
+  const { language, t } = useTranslation();
+
+  const greeting = language === 'uz' ? 'Xayrli kun, Admin 👋' : language === 'ru' ? 'Добрый день, Администратор 👋' : 'Good afternoon, Admin 👋';
+  const desc = language === 'uz' ? "Bugun kampusingizda sodir bo'layotgan voqealar." : language === 'ru' ? 'Вот что происходит в вашем кампусе сегодня.' : "Here's what's happening at your campus today.";
+  const todayLabel = language === 'uz' ? 'Bugun' : language === 'ru' ? 'Сегодня' : 'Today';
+  const viewReportsLabel = language === 'uz' ? 'Hisobotlar' : language === 'ru' ? 'Отчеты' : 'View Reports';
+  const fromLastMonthLabel = language === 'uz' ? "o'tgan oydan beri" : language === 'ru' ? 'с прошлого месяца' : 'from last month';
+  const viewAllLabel = language === 'uz' ? "Hammasini ko'rish" : language === 'ru' ? 'Показать все' : 'View All';
+  const fullCalendarLabel = language === 'uz' ? "To'liq kalendar" : language === 'ru' ? 'Весь календарь' : 'Full Calendar';
+
+  const getTranslatedTitle = (title: string) => {
+    if (title === 'Total Students') return t('totalStudents');
+    if (title === 'Active Courses') return t('activeCourses');
+    if (title === 'Today\'s Attendance') return t('todaysAttendance');
+    if (title === 'Avg. Grade') return t('avgGrade');
+    return title;
+  };
+
   return (
     <div className="animate-fade-in">
       {/* Page Header */}
       <div className="page-header">
         <div className="page-header-left">
-          <h1>Good afternoon, Admin 👋</h1>
-          <p>Here's what's happening at your campus today.</p>
+          <h1>{greeting}</h1>
+          <p>{desc}</p>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
           <button className="btn btn-secondary">
             <Calendar size={16} />
-            Today
+            {todayLabel}
           </button>
           <button className="btn btn-primary">
             <Activity size={16} />
-            View Reports
+            {viewReportsLabel}
           </button>
         </div>
       </div>
@@ -88,7 +108,7 @@ export function DashboardPage() {
           return (
             <div key={stat.title} className="card animate-fade-in">
               <div className="card-header">
-                <span className="card-title">{stat.title}</span>
+                <span className="card-title">{getTranslatedTitle(stat.title)}</span>
                 <div className={`stat-icon ${stat.iconColor}`}>
                   <Icon size={22} />
                 </div>
@@ -100,7 +120,7 @@ export function DashboardPage() {
                 ) : (
                   <ArrowDownRight size={14} />
                 )}
-                {stat.change} from last month
+                {stat.change} {fromLastMonthLabel}
               </div>
             </div>
           );
@@ -112,8 +132,8 @@ export function DashboardPage() {
         {/* Recent Activity */}
         <div className="card">
           <div className="card-header">
-            <h3 style={{ fontSize: '1rem' }}>Recent Activity</h3>
-            <button className="btn btn-ghost btn-sm">View All</button>
+            <h3 style={{ fontSize: '1rem' }}>{t('recentActivity')}</h3>
+            <button className="btn btn-ghost btn-sm">{viewAllLabel}</button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             {recentActivities.map((activity, i) => (
@@ -157,8 +177,8 @@ export function DashboardPage() {
         {/* Today's Schedule */}
         <div className="card">
           <div className="card-header">
-            <h3 style={{ fontSize: '1rem' }}>Today's Schedule</h3>
-            <button className="btn btn-ghost btn-sm">Full Calendar</button>
+            <h3 style={{ fontSize: '1rem' }}>{t('upcomingSchedule')}</h3>
+            <button className="btn btn-ghost btn-sm">{fullCalendarLabel}</button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             {upcomingSchedule.map((item, i) => (
@@ -209,7 +229,7 @@ export function DashboardPage() {
                     item.status === 'In Progress' ? 'badge-success' : 'badge-info'
                   }`}
                 >
-                  {item.status}
+                  {item.status === 'In Progress' ? t('inProgress') : t('upcoming')}
                 </span>
               </div>
             ))}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../api/services/auth.service';
 import { useAuthStore } from '../../store/auth.store';
+import { useTranslation, LanguageSwitcher } from '../../providers/LanguageProvider';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -10,6 +11,7 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
+  const { t } = useTranslation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,16 +38,19 @@ export function LoginPage() {
 
   return (
     <div className="auth-layout">
-      <div className="auth-panel">
+      <div className="auth-panel" style={{ position: 'relative' }}>
+        <div style={{ position: 'absolute', top: '24px', right: '24px' }}>
+          <LanguageSwitcher />
+        </div>
         <div className="auth-form-container animate-fade-in">
           <div className="auth-brand">
             <div className="auth-brand-icon">C</div>
             <span className="auth-brand-name">CampusOS</span>
           </div>
 
-          <h1 className="auth-title">Welcome back</h1>
+          <h1 className="auth-title">{t('welcomeBack')}</h1>
           <p className="auth-subtitle">
-            Sign in to your account to continue
+            {t('loginSubtitle')}
           </p>
 
           {error && (
@@ -57,7 +62,7 @@ export function LoginPage() {
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label className="form-label" htmlFor="email">
-                Email address
+                {t('emailLabel')}
               </label>
               <input
                 id="email"
@@ -73,7 +78,7 @@ export function LoginPage() {
 
             <div className="form-group">
               <label className="form-label" htmlFor="password">
-                Password
+                {t('passwordLabel')}
               </label>
               <input
                 id="password"
@@ -118,7 +123,7 @@ export function LoginPage() {
               style={{ width: '100%', padding: 'var(--space-3)' }}
               disabled={loading}
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? t('signingIn') : t('signInBtn')}
             </button>
           </form>
 
@@ -139,14 +144,10 @@ export function LoginPage() {
       <div className="auth-hero">
         <div className="auth-hero-content">
           <h2 className="auth-hero-title">
-            Your Complete
-            <br />
-            Education Platform
+            {t('heroTitle')}
           </h2>
           <p className="auth-hero-desc">
-            Manage courses, track attendance, grade assignments, and engage
-            students — all from one powerful, subject-agnostic platform built
-            for modern education.
+            {t('heroSubtitle')}
           </p>
         </div>
       </div>

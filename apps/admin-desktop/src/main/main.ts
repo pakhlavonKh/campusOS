@@ -7,8 +7,6 @@ app.disableHardwareAcceleration();
 let mainWindow: BrowserWindow | null = null;
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
-const STATE_FILE = path.join(app.getPath('userData'), 'admin-window-state.json');
-
 interface WindowState {
   width: number;
   height: number;
@@ -19,8 +17,9 @@ interface WindowState {
 
 function getSavedState(): WindowState {
   try {
-    if (fs.existsSync(STATE_FILE)) {
-      return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    const stateFile = path.join(app.getPath('userData'), 'admin-window-state.json');
+    if (fs.existsSync(stateFile)) {
+      return JSON.parse(fs.readFileSync(stateFile, 'utf8'));
     }
   } catch (err) {
     console.error('Failed to load window state:', err);
@@ -30,6 +29,7 @@ function getSavedState(): WindowState {
 
 function saveState(window: BrowserWindow) {
   try {
+    const stateFile = path.join(app.getPath('userData'), 'admin-window-state.json');
     const bounds = window.getBounds();
     const state: WindowState = {
       width: bounds.width,
@@ -38,7 +38,7 @@ function saveState(window: BrowserWindow) {
       y: bounds.y,
       isMaximized: window.isMaximized(),
     };
-    fs.writeFileSync(STATE_FILE, JSON.stringify(state), 'utf8');
+    fs.writeFileSync(stateFile, JSON.stringify(state), 'utf8');
   } catch (err) {
     console.error('Failed to save window state:', err);
   }

@@ -76,6 +76,233 @@ export default function App() {
   // App version
   const [appVersion, setAppVersion] = useState('1.0.0');
 
+  // Multi-language state & dictionary
+  const [lang, setLang] = useState<'en' | 'ru' | 'uz'>(() => {
+    return (localStorage.getItem('admin_lang') as 'en' | 'ru' | 'uz') || 'en';
+  });
+
+  const changeLang = (l: 'en' | 'ru' | 'uz') => {
+    setLang(l);
+    localStorage.setItem('admin_lang', l);
+  };
+
+  const localTranslations: Record<'en' | 'ru' | 'uz', Record<string, string>> = {
+    en: {
+      consoleTitle: 'Platform Super Admin',
+      accessRestricted: 'Access restricted internal platform console',
+      emailLabel: 'Email Address',
+      passwordLabel: 'Password',
+      signInBtn: 'Sign In to Console',
+      signingIn: 'Signing In...',
+      orgManagement: 'Organization Management',
+      billingQuotas: 'Billing & Quotas',
+      featureFlags: 'Global Feature Flags',
+      impersonation: 'Support Impersonation',
+      systemHealth: 'System Health',
+      logout: 'Sign Out Console',
+      serverOnline: 'Server Online',
+      activeTenants: 'Active Tenancies',
+      tenantName: 'Tenant Name',
+      slugIdentifier: 'Slug Identifier',
+      billingPlan: 'Billing Plan',
+      status: 'Status',
+      createdDate: 'Created Date',
+      securityControl: 'Security Control',
+      suspendTenant: 'Suspend Tenant',
+      activateTenant: 'Activate Tenant',
+      quotaOverrides: 'Edit Quota Overrides',
+      billingPlanTier: 'Billing Plan Tier',
+      maxActiveStudents: 'Max Active Students',
+      storageQuotaGb: 'Storage Quota (GB)',
+      applyChanges: 'Apply Changes',
+      cancel: 'Cancel',
+      resourceLicensingControls: 'Resource & Licensing Controls',
+      studentLimit: 'Student Limit',
+      storageLimit: 'Storage Limit',
+      configureLimits: 'Configure Limits',
+      globalSystemOverrides: 'Global System Overrides',
+      globalOverridesDesc: 'These settings enforce global environment overrides directly in the backend cache layer. Changes take effect instantly system-wide.',
+      rlsTitle: 'Row Level Security (RLS) Policies',
+      rlsDesc: 'Toggle DB multi-tenant isolation layers',
+      aiTitle: 'AI & Speech Assessment Engine',
+      aiDesc: 'Turn on/off speech pronunciation features globally',
+      genAiTitle: 'Enable GenAI Support Copilots',
+      genAiDesc: 'Toggles LLM components in Student LMS',
+      maintenanceTitle: 'Global Maintenance Mode',
+      maintenanceDesc: 'Restricts all client app requests to static maintenance view',
+      auditedSupportTitle: 'Audited Support Access Mode',
+      auditedSupportDesc: 'For security reasons, any platform admin entering the workspace of a tenant is logged. The audit record is immutable and stored permanently.',
+      selectTargetOrg: 'Select Target Organization',
+      chooseTenant: '-- Choose Tenant --',
+      targetUserId: 'Target User ID (UUID)',
+      reasonImpersonation: 'Reason for Impersonation',
+      reasonPlaceholder: 'Explain why client data access is needed (ticket reference, database error, billing audit)...',
+      authorizeImpersonation: 'Authorize & Log Support Session',
+      dbStatus: 'Database Status',
+      activeConnections: 'Active Connections',
+      avgQueryExecution: 'Avg Query Execution',
+      lastMigrationRun: 'Last Migration Run',
+      cacheJobQueues: 'Cache & Job Queues',
+      redisCacheHits: 'Redis Cache Hits',
+      bullmqPendingJobs: 'BullMQ Pending Jobs',
+      activeWorkers: 'Active Workers',
+      avgQueueProcessTime: 'Avg Queue Process Time',
+      securityAuditing: 'Security & Auditing',
+      auditLogs24h: 'Audit Logs Recorded (24h)',
+      activeImpersonations: 'Active Impersonations',
+      failedAdminLogins: 'Failed Admin Logins',
+      versionText: 'Console Version',
+      free: 'Free',
+      growth: 'Growth',
+      pro: 'Pro',
+      actions: 'Actions'
+    },
+    ru: {
+      consoleTitle: 'Панель супер-администратора',
+      accessRestricted: 'Доступ ограничен внутренним пультом управления',
+      emailLabel: 'Электронная почта',
+      passwordLabel: 'Пароль',
+      signInBtn: 'Войти в панель',
+      signingIn: 'Вход...',
+      orgManagement: 'Управление организациями',
+      billingQuotas: 'Тарифы и квоты',
+      featureFlags: 'Глобальные функции',
+      impersonation: 'Поддержка и сессии',
+      systemHealth: 'Здоровье системы',
+      logout: 'Выйти из консоли',
+      serverOnline: 'Сервер Онлайн',
+      activeTenants: 'Активные клиенты',
+      tenantName: 'Название организации',
+      slugIdentifier: 'Алиас (Slug)',
+      billingPlan: 'Тарифный план',
+      status: 'Статус',
+      createdDate: 'Дата создания',
+      securityControl: 'Управление безопасностью',
+      suspendTenant: 'Приостановить',
+      activateTenant: 'Активировать',
+      quotaOverrides: 'Редактировать лимиты',
+      billingPlanTier: 'Уровень тарифа',
+      maxActiveStudents: 'Макс. активных студентов',
+      storageQuotaGb: 'Квота хранилища (ГБ)',
+      applyChanges: 'Применить изменения',
+      cancel: 'Отмена',
+      resourceLicensingControls: 'Управление ресурсами и лицензированием',
+      studentLimit: 'Лимит студентов',
+      storageLimit: 'Лимит хранилища',
+      configureLimits: 'Настроить лимиты',
+      globalSystemOverrides: 'Глобальные настройки системы',
+      globalOverridesDesc: 'Эти настройки применяют глобальные переменные окружения напрямую в кэш-слое бэкенда. Изменения вступают в силу мгновенно.',
+      rlsTitle: 'Политики безопасности строк (RLS)',
+      rlsDesc: 'Включение многоарендной изоляции на уровне БД',
+      aiTitle: 'Движок оценки речи и ИИ',
+      aiDesc: 'Включение глобального оценивания произношения',
+      genAiTitle: 'Включение GenAI ассистентов',
+      genAiDesc: 'Переключает компоненты ИИ в личном кабинете студента',
+      maintenanceTitle: 'Глобальный режим обслуживания',
+      maintenanceDesc: 'Перенаправляет все запросы на страницу обслуживания',
+      auditedSupportTitle: 'Поддержка с аудитом доступа',
+      auditedSupportDesc: 'В целях безопасности вход администраторов в пространства клиентов логируется. Запись аудита неизменяема и хранится вечно.',
+      selectTargetOrg: 'Выберите организацию',
+      chooseTenant: '-- Выберите клиента --',
+      targetUserId: 'ID пользователя (UUID)',
+      reasonImpersonation: 'Причина входа',
+      reasonPlaceholder: 'Опишите причину доступа к данным клиента (номер тикета, ошибка в БД, аудит биллинга)...',
+      authorizeImpersonation: 'Авторизовать и логировать сессию',
+      dbStatus: 'Статус базы данных',
+      activeConnections: 'Активные соединения',
+      avgQueryExecution: 'Ср. время выполнения запроса',
+      lastMigrationRun: 'Последняя миграция',
+      cacheJobQueues: 'Кэш и очереди задач',
+      redisCacheHits: 'Хит-рейт кэша Redis',
+      bullmqPendingJobs: 'Ожидающие задачи BullMQ',
+      activeWorkers: 'Активные воркеры',
+      avgQueueProcessTime: 'Ср. время обработки очереди',
+      securityAuditing: 'Аудит и безопасность',
+      auditLogs24h: 'Логи аудита (24ч)',
+      activeImpersonations: 'Активные сессии имитации',
+      failedAdminLogins: 'Ошибки входа админа',
+      versionText: 'Версия консоли',
+      free: 'Бесплатный',
+      growth: 'Рост',
+      pro: 'Про',
+      actions: 'Действия'
+    },
+    uz: {
+      consoleTitle: 'Super Admin Boshqaruv Paneli',
+      accessRestricted: 'Kirish cheklangan ichki tizim konsoli',
+      emailLabel: 'Elektron pochta manzili',
+      passwordLabel: 'Parol',
+      signInBtn: 'Konsolga kirish',
+      signingIn: 'Kirilmoqda...',
+      orgManagement: 'Tashkilotlarni boshqarish',
+      billingQuotas: 'Tariflar va limitlar',
+      featureFlags: 'Global funksiyalar',
+      impersonation: 'Impersonatsiya',
+      systemHealth: 'Tizim salomatligi',
+      logout: 'Konsoldan chiqish',
+      serverOnline: 'Server Onlayn',
+      activeTenants: 'Faol mijozlar',
+      tenantName: 'Tashkilot nomi',
+      slugIdentifier: 'Slug',
+      billingPlan: 'Tarif rejasi',
+      status: 'Holat',
+      createdDate: 'Yaratilgan sana',
+      securityControl: 'Xavfsizlik nazorati',
+      suspendTenant: 'To\'xtatish',
+      activateTenant: 'Faollashtirish',
+      quotaOverrides: 'Limitlarni tahrirlash',
+      billingPlanTier: 'Tarif darajasi',
+      maxActiveStudents: 'Maks. faol talabalar',
+      storageQuotaGb: 'Xotira limiti (GB)',
+      applyChanges: 'O\'zgarishlarni saqlash',
+      cancel: 'Bekor qilish',
+      resourceLicensingControls: 'Resurs va litsenziya nazorati',
+      studentLimit: 'Talabalar limiti',
+      storageLimit: 'Xotira limiti',
+      configureLimits: 'Limitlarni sozlash',
+      globalSystemOverrides: 'Global tizim sozlamalari',
+      globalOverridesDesc: 'Ushbu sozlamalar global muhit qiymatlarini to\'g\'ridan-to\'g\'ri kesh qatlamida o\'zgartiradi. O\'zgarishlar darhol kuchga kiradi.',
+      rlsTitle: 'Qator darajasidagi xavfsizlik (RLS)',
+      rlsDesc: 'Bazada ko\'p ijarali ajratish siyosatini yoqish',
+      aiTitle: 'Sun\'iy intellekt va nutqni baholash',
+      aiDesc: 'Nutq talaffuzini baholash xizmatini yoqish',
+      genAiTitle: 'GenAI yordamchilarini yoqish',
+      genAiDesc: 'LMS talabalar interfeysida sun\'iy intellektni yoqadi',
+      maintenanceTitle: 'Global texnik xizmat rejimi',
+      maintenanceDesc: 'Barcha mijoz so\'rovlarini texnik xizmat ko\'rsatish sahifasiga yo\'naltiradi',
+      auditedSupportTitle: 'Audit qilinadigan qo\'llab-quvvatlash rejimi',
+      auditedSupportDesc: 'Xavfsizlik nuqtai nazaridan, administratorning mijoz maydoniga kirishi qayd etiladi. Ushbu yozuv doimiydir.',
+      selectTargetOrg: 'Tashkilotni tanlang',
+      chooseTenant: '-- Mijozni tanlang --',
+      targetUserId: 'Foydalanuvchi ID (UUID)',
+      reasonImpersonation: 'Kirish sababi',
+      reasonPlaceholder: 'Mijoz ma\'lumotlariga kirish sababini tushuntiring (murojaat raqami, xatolik, billing auditi)...',
+      authorizeImpersonation: 'Avtorizatsiya qilish va seansni yozish',
+      dbStatus: 'Ma\'lumotlar bazasi holati',
+      activeConnections: 'Faol aloqalar',
+      avgQueryExecution: 'O\'rtacha so\'rov vaqti',
+      lastMigrationRun: 'So\'nggi ishga tushgan migratsiya',
+      cacheJobQueues: 'Kesh va navbatlar',
+      redisCacheHits: 'Redis kesh ko\'rsatkichi',
+      bullmqPendingJobs: 'Kutilayotgan BullMQ vazifalari',
+      activeWorkers: 'Faol ishchilar (Workers)',
+      avgQueueProcessTime: 'O\'rtacha navbat vaqti',
+      securityAuditing: 'Xavfsizlik va audit',
+      auditLogs24h: 'Audit yozuvlari (24s)',
+      activeImpersonations: 'Faol impersonatsiyalar',
+      failedAdminLogins: 'Muvaffaqiyatsiz kirishlar',
+      versionText: 'Konsol versiyasi',
+      free: 'Bepul',
+      growth: 'O\'sish',
+      pro: 'Pro',
+      actions: 'Amallar'
+    }
+  };
+
+  const t = (key: string) => {
+    return localTranslations[lang][key] || localTranslations.en[key] || key;
+  };
+
   useEffect(() => {
     if (window.electronAPI) {
       window.electronAPI.getAppVersion().then(v => setAppVersion(v));
@@ -94,7 +321,6 @@ export default function App() {
     setIsLoading(true);
 
     try {
-      // Connect to modular monolith auth api endpoint
       const response = await fetch('http://localhost:3000/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -113,14 +339,12 @@ export default function App() {
         throw new Error('Authentication token not returned by server');
       }
 
-      // Verify the platform_super_admin role claim using preload IPC API
       if (window.electronAPI) {
         const verifyRes = await window.electronAPI.verifyTokenRole(accessToken);
         if (!verifyRes.valid) {
           throw new Error(verifyRes.error || 'Access restricted to Platform Super Admins only.');
         }
       } else {
-        // Fallback for standard browser context (decodes token payload)
         const payload = JSON.parse(atob(accessToken.split('.')[1]));
         if (!payload.roles || !payload.roles.includes('platform_super_admin')) {
           throw new Error('Access restricted to Platform Super Admins only.');
@@ -156,7 +380,6 @@ export default function App() {
       const data = await response.json();
       setOrgs(data);
     } catch (err) {
-      // Offline / Connection refused fallbacks (Load rich mock database representation)
       console.warn('API Offline. Loading offline system representation.');
       setOrgs([
         {
@@ -209,7 +432,6 @@ export default function App() {
       showStatusAlert('success', `Organization status set to ${nextStatus}`);
       fetchOrganizations();
     } catch (err) {
-      // Mock update locally if server is not reachable
       setOrgs((prev: any) => prev.map((o: any) => o.id === org.id ? { ...o, status: nextStatus } : o));
       showStatusAlert('success', `[Offline Demo] Saved: status toggled to ${nextStatus}`);
     }
@@ -243,7 +465,6 @@ export default function App() {
       setEditingOrg(null);
       fetchOrganizations();
     } catch (err) {
-      // Mock update locally if offline
       setOrgs((prev: any) => prev.map((o: any) => o.id === editingOrg.id ? { ...o, billingPlan: newPlan, settings: payload.settings } : o));
       showStatusAlert('success', '[Offline Demo] Saved: plan quota overrides applied');
       setEditingOrg(null);
@@ -290,6 +511,31 @@ export default function App() {
     showStatusAlert('success', `Global flag '${String(key)}' updated`);
   };
 
+  const LanguageSwitcherLocal = () => (
+    <div style={{ display: 'flex', gap: '4px', background: 'rgba(0, 0, 0, 0.05)', padding: '4px', borderRadius: '6px', border: '1px solid rgba(0, 0, 0, 0.08)' }}>
+      {(['en', 'ru', 'uz'] as const).map(l => (
+        <button
+          key={l}
+          type="button"
+          onClick={() => changeLang(l)}
+          style={{
+            border: 'none',
+            background: lang === l ? '#6366f1' : 'transparent',
+            color: lang === l ? 'white' : '#475569',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          {l.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
+
   if (!token) {
     return (
       <div className="login-container">
@@ -299,16 +545,16 @@ export default function App() {
             align-items: center;
             justify-content: center;
             height: 100vh;
-            background: radial-gradient(circle at top right, #1e1b4b, #090514);
+            background: radial-gradient(circle at top right, #eef2ff, #f8fafc);
+            position: relative;
           }
           .login-card {
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.08);
             border-radius: 16px;
             padding: 40px;
             width: 440px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.06);
           }
           .login-header {
             text-align: center;
@@ -316,14 +562,14 @@ export default function App() {
           }
           .login-header h2 {
             margin: 0;
-            color: #fff;
+            color: #0f172a;
             font-size: 24px;
             font-weight: 700;
             letter-spacing: -0.5px;
           }
           .login-header p {
             margin: 8px 0 0 0;
-            color: #64748b;
+            color: #475569;
             font-size: 14px;
           }
           .form-group {
@@ -334,17 +580,17 @@ export default function App() {
             margin-bottom: 8px;
             font-size: 12px;
             font-weight: 600;
-            color: #94a3b8;
+            color: #475569;
             text-transform: uppercase;
             letter-spacing: 0.5px;
           }
           .form-control {
             width: 100%;
             padding: 12px 16px;
-            background: rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.12);
             border-radius: 8px;
-            color: #fff;
+            color: #0f172a;
             font-size: 14px;
             transition: all 0.3s ease;
           }
@@ -377,7 +623,7 @@ export default function App() {
             border: 1px solid rgba(239, 68, 68, 0.25);
             padding: 12px;
             border-radius: 8px;
-            color: #f87171;
+            color: #ef4444;
             font-size: 13px;
             margin-bottom: 20px;
             display: flex;
@@ -385,11 +631,14 @@ export default function App() {
             align-items: center;
           }
         `}</style>
+        <div style={{ position: 'absolute', top: '24px', right: '24px' }}>
+          <LanguageSwitcherLocal />
+        </div>
         <div className="login-card">
           <div className="login-header">
             <Building2 size={36} color="#6366f1" style={{ marginBottom: '12px' }} />
-            <h2>Platform Super Admin</h2>
-            <p>Access restricted internal platform console</p>
+            <h2>{t('consoleTitle')}</h2>
+            <p>{t('accessRestricted')}</p>
           </div>
           {loginError && (
             <div className="error-alert">
@@ -399,7 +648,7 @@ export default function App() {
           )}
           <form onSubmit={handleLogin}>
             <div className="form-group">
-              <label>Email Address</label>
+              <label>{t('emailLabel')}</label>
               <input
                 type="email"
                 required
@@ -410,7 +659,7 @@ export default function App() {
               />
             </div>
             <div className="form-group">
-              <label>Password</label>
+              <label>{t('passwordLabel')}</label>
               <input
                 type="password"
                 required
@@ -422,7 +671,7 @@ export default function App() {
             </div>
             <button type="submit" className="btn-primary" disabled={isLoading}>
               {isLoading ? <Loader2 className="spinner" size={16} /> : null}
-              Sign In to Console
+              {t('signInBtn')}
             </button>
           </form>
         </div>
@@ -436,13 +685,13 @@ export default function App() {
         .app-container {
           display: flex;
           height: 100vh;
-          background: #090c15;
+          background: #f8fafc;
           overflow: hidden;
         }
         .sidebar {
           width: 260px;
-          background: #0f1322;
-          border-right: 1px solid rgba(255, 255, 255, 0.05);
+          background: #ffffff;
+          border-right: 1px solid rgba(0, 0, 0, 0.08);
           display: flex;
           flex-direction: column;
           padding: 20px 0;
@@ -452,13 +701,13 @@ export default function App() {
           align-items: center;
           gap: 12px;
           padding: 0 20px 24px 20px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          border-bottom: 1px solid rgba(0, 0, 0, 0.08);
         }
         .sidebar-brand h3 {
           margin: 0;
           font-size: 16px;
           font-weight: 700;
-          color: white;
+          color: #0f172a;
         }
         .sidebar-brand span {
           display: block;
@@ -478,7 +727,7 @@ export default function App() {
           align-items: center;
           gap: 12px;
           padding: 12px 16px;
-          color: #94a3b8;
+          color: #475569;
           text-decoration: none;
           font-size: 14px;
           font-weight: 500;
@@ -488,16 +737,16 @@ export default function App() {
           transition: all 0.2s;
         }
         .menu-item:hover, .menu-item.active {
-          color: white;
-          background: rgba(99, 102, 241, 0.1);
+          color: #4f46e5;
+          background: rgba(99, 102, 241, 0.08);
         }
         .menu-item.active {
-          border: 1px solid rgba(99, 102, 241, 0.25);
-          color: #818cf8;
+          border: 1px solid rgba(99, 102, 241, 0.2);
+          color: #4f46e5;
         }
         .sidebar-footer {
           padding: 0 16px;
-          border-top: 1px solid rgba(255, 255, 255, 0.05);
+          border-top: 1px solid rgba(0, 0, 0, 0.08);
           padding-top: 16px;
         }
         .logout-btn {
@@ -506,9 +755,9 @@ export default function App() {
           align-items: center;
           gap: 10px;
           padding: 10px 16px;
-          color: #f87171;
+          color: #dc2626;
           background: transparent;
-          border: 1px solid rgba(239, 68, 68, 0.2);
+          border: 1px solid rgba(220, 38, 38, 0.25);
           border-radius: 8px;
           font-size: 13px;
           font-weight: 600;
@@ -516,7 +765,7 @@ export default function App() {
           transition: all 0.2s;
         }
         .logout-btn:hover {
-          background: rgba(239, 68, 68, 0.1);
+          background: rgba(220, 38, 38, 0.06);
         }
         .app-main {
           flex: 1;
@@ -526,18 +775,18 @@ export default function App() {
         }
         .app-header {
           height: 64px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          border-bottom: 1px solid rgba(0, 0, 0, 0.08);
           display: flex;
           align-items: center;
           justify-content: space-between;
           padding: 0 32px;
-          background: #0f1322;
+          background: #ffffff;
         }
         .app-header h1 {
           margin: 0;
           font-size: 18px;
           font-weight: 600;
-          color: white;
+          color: #0f172a;
         }
         .app-body {
           flex: 1;
@@ -545,17 +794,17 @@ export default function App() {
           overflow-y: auto;
         }
         .glass-card {
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.05);
+          background: #ffffff;
+          border: 1px solid rgba(0, 0, 0, 0.08);
           border-radius: 12px;
           padding: 24px;
           margin-bottom: 24px;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+          box-shadow: 0 10px 30px rgba(0,0,0,0.02);
         }
         .card-title {
           font-size: 15px;
           font-weight: 600;
-          color: white;
+          color: #0f172a;
           margin-top: 0;
           margin-bottom: 20px;
           display: flex;
@@ -573,13 +822,13 @@ export default function App() {
           font-weight: 600;
           color: #64748b;
           text-transform: uppercase;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          border-bottom: 1px solid rgba(0, 0, 0, 0.08);
         }
         .tenant-table td {
           padding: 16px 12px;
           font-size: 14px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-          color: #cbd5e1;
+          border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+          color: #334155;
         }
         .badge {
           display: inline-flex;
@@ -589,11 +838,11 @@ export default function App() {
           font-weight: 600;
           text-transform: uppercase;
         }
-        .badge.active { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
-        .badge.suspended { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-        .badge.free { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
-        .badge.pro { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
-        .badge.growth { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+        .badge.active { background: rgba(34, 197, 94, 0.15); color: #16a34a; }
+        .badge.suspended { background: rgba(239, 68, 68, 0.15); color: #dc2626; }
+        .badge.free { background: rgba(148, 163, 184, 0.15); color: #475569; }
+        .badge.pro { background: rgba(168, 85, 247, 0.15); color: #7c3aed; }
+        .badge.growth { background: rgba(59, 130, 246, 0.15); color: #2563eb; }
         
         .btn {
           padding: 8px 16px;
@@ -610,19 +859,19 @@ export default function App() {
         }
         .btn-outline-danger {
           background: transparent;
-          border: 1px solid rgba(239, 68, 68, 0.4);
-          color: #f87171;
+          border: 1px solid rgba(220, 38, 38, 0.4);
+          color: #dc2626;
         }
         .btn-outline-danger:hover {
-          background: rgba(239, 68, 68, 0.1);
+          background: rgba(220, 38, 38, 0.06);
         }
         .btn-outline-primary {
           background: transparent;
           border: 1px solid rgba(99, 102, 241, 0.5);
-          color: #818cf8;
+          color: #4f46e5;
         }
         .btn-outline-primary:hover {
-          background: rgba(99, 102, 241, 0.1);
+          background: rgba(99, 102, 241, 0.08);
         }
         .grid-2 {
           display: grid;
@@ -638,7 +887,7 @@ export default function App() {
           border-radius: 6px;
           padding: 16px;
           color: white;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+          box-shadow: 0 10px 25px rgba(0,0,0,0.2);
           display: flex;
           align-items: center;
           gap: 12px;
@@ -662,7 +911,7 @@ export default function App() {
           align-items: center;
           justify-content: space-between;
           padding: 12px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+          border-bottom: 1px solid rgba(0, 0, 0, 0.04);
         }
         .switch {
           position: relative;
@@ -675,7 +924,7 @@ export default function App() {
           position: absolute;
           cursor: pointer;
           top: 0; left: 0; right: 0; bottom: 0;
-          background-color: #334155;
+          background-color: #cbd5e1;
           transition: .3s;
           border-radius: 24px;
         }
@@ -695,15 +944,15 @@ export default function App() {
         .metric-card {
           padding: 16px;
           border-radius: 8px;
-          background: rgba(255, 255, 255, 0.01);
-          border: 1px solid rgba(255, 255, 255, 0.03);
+          background: rgba(0, 0, 0, 0.02);
+          border: 1px solid rgba(0, 0, 0, 0.04);
           display: flex;
           flex-direction: column;
         }
         .metric-value {
           font-size: 24px;
           font-weight: 700;
-          color: white;
+          color: #0f172a;
           margin-top: 4px;
         }
         .metric-label {
@@ -726,7 +975,7 @@ export default function App() {
           <Building2 size={28} color="#6366f1" />
           <div>
             <h3>CampusOS</h3>
-            <span>Super Admin</span>
+            <span>{t('consoleTitle')}</span>
           </div>
         </div>
 
@@ -736,45 +985,45 @@ export default function App() {
             onClick={() => { setActiveTab('orgs'); setEditingOrg(null); }}
           >
             <Building2 size={18} />
-            <span>Organization Management</span>
+            <span>{t('orgManagement')}</span>
           </li>
           <li 
             className={`menu-item ${activeTab === 'billing' ? 'active' : ''}`}
             onClick={() => { setActiveTab('billing'); setEditingOrg(null); }}
           >
             <CreditCard size={18} />
-            <span>Billing & Quotas</span>
+            <span>{t('billingQuotas')}</span>
           </li>
           <li 
             className={`menu-item ${activeTab === 'flags' ? 'active' : ''}`}
             onClick={() => { setActiveTab('flags'); setEditingOrg(null); }}
           >
             <Flag size={18} />
-            <span>Global Feature Flags</span>
+            <span>{t('featureFlags')}</span>
           </li>
           <li 
             className={`menu-item ${activeTab === 'support' ? 'active' : ''}`}
             onClick={() => { setActiveTab('support'); setEditingOrg(null); }}
           >
             <UserCheck size={18} />
-            <span>Support Impersonation</span>
+            <span>{t('impersonation')}</span>
           </li>
           <li 
             className={`menu-item ${activeTab === 'health' ? 'active' : ''}`}
             onClick={() => { setActiveTab('health'); setEditingOrg(null); }}
           >
             <Activity size={18} />
-            <span>System Health</span>
+            <span>{t('systemHealth')}</span>
           </li>
         </ul>
 
         <div className="sidebar-footer">
           <div style={{ color: '#475569', fontSize: '11px', textAlign: 'center', marginBottom: '12px' }}>
-            Console Version {appVersion}
+            {t('versionText')} {appVersion}
           </div>
           <button className="logout-btn" onClick={handleLogout}>
             <LogOut size={16} />
-            Sign Out Console
+            {t('logout')}
           </button>
         </div>
       </div>
@@ -783,14 +1032,15 @@ export default function App() {
       <div className="app-main">
         <div className="app-header">
           <h1>
-            {activeTab === 'orgs' && 'Organization Lifecycle Management'}
-            {activeTab === 'billing' && 'Quota Overrides & Plans'}
-            {activeTab === 'flags' && 'System Configuration & Flags'}
-            {activeTab === 'support' && 'Audited Impersonation Tools'}
-            {activeTab === 'health' && 'Platform Performance & Health'}
+            {activeTab === 'orgs' && t('orgManagement')}
+            {activeTab === 'billing' && t('billingQuotas')}
+            {activeTab === 'flags' && t('featureFlags')}
+            {activeTab === 'support' && t('impersonation')}
+            {activeTab === 'health' && t('systemHealth')}
           </h1>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <span className="badge active" style={{ fontSize: '10px' }}>Server Online</span>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+            <LanguageSwitcherLocal />
+            <span className="badge active" style={{ fontSize: '10px' }}>{t('serverOnline')}</span>
           </div>
         </div>
 
@@ -799,8 +1049,8 @@ export default function App() {
           {activeTab === 'orgs' && (
             <div className="glass-card">
               <div className="card-title">
-                <Building2 size={20} color="#818cf8" />
-                <span>Active Tenancies</span>
+                <Building2 size={20} color="#6366f1" />
+                <span>{t('activeTenants')}</span>
               </div>
 
               {loadingOrgs ? (
@@ -811,24 +1061,24 @@ export default function App() {
                 <table className="tenant-table">
                   <thead>
                     <tr>
-                      <th>Tenant Name</th>
-                      <th>Slug Identifier</th>
-                      <th>Billing Plan</th>
-                      <th>Status</th>
-                      <th>Created Date</th>
-                      <th>Security Control</th>
+                      <th>{t('tenantName')}</th>
+                      <th>{t('slugIdentifier')}</th>
+                      <th>{t('billingPlan')}</th>
+                      <th>{t('status')}</th>
+                      <th>{t('createdDate')}</th>
+                      <th>{t('securityControl')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {orgs.map((org: any) => (
                       <tr key={org.id}>
-                        <td style={{ fontWeight: '600', color: '#fff' }}>{org.name}</td>
+                        <td style={{ fontWeight: '600', color: '#0f172a' }}>{org.name}</td>
                         <td><code>{org.slug}</code></td>
                         <td>
-                          <span className={`badge ${org.billingPlan}`}>{org.billingPlan}</span>
+                          <span className={`badge ${org.billingPlan}`}>{t(org.billingPlan)}</span>
                         </td>
                         <td>
-                          <span className={`badge ${org.status}`}>{org.status}</span>
+                          <span className={`badge ${org.status}`}>{t(org.status)}</span>
                         </td>
                         <td>{new Date(org.createdAt).toLocaleDateString()}</td>
                         <td>
@@ -836,7 +1086,7 @@ export default function App() {
                             className={`btn btn-sm ${org.status === 'active' ? 'btn-outline-danger' : 'btn-outline-primary'}`}
                             onClick={() => toggleTenantStatus(org)}
                           >
-                            {org.status === 'active' ? 'Suspend Tenant' : 'Activate Tenant'}
+                            {org.status === 'active' ? t('suspendTenant') : t('activateTenant')}
                           </button>
                         </td>
                       </tr>
@@ -853,27 +1103,27 @@ export default function App() {
               {editingOrg ? (
                 <div className="glass-card">
                   <div className="card-title">
-                    <Sliders size={20} color="#c084fc" />
-                    <span>Edit Quota Overrides — {editingOrg.name}</span>
+                    <Sliders size={20} color="#6366f1" />
+                    <span>{t('quotaOverrides')} — {editingOrg.name}</span>
                   </div>
                   <form onSubmit={saveQuota}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '24px' }}>
                       <div className="form-group">
-                        <label>Billing Plan Tier</label>
+                        <label>{t('billingPlanTier')}</label>
                         <select 
                           className="form-control" 
                           value={newPlan} 
                           onChange={(e: any) => setNewPlan(e.target.value)}
-                          style={{ background: '#1e293b' }}
+                          style={{ background: '#ffffff', color: '#0f172a' }}
                         >
-                          <option value="free">Free Tier</option>
-                          <option value="growth">Growth Academy</option>
-                          <option value="pro">Pro Enterprise</option>
+                          <option value="free">{t('free')}</option>
+                          <option value="growth">{t('growth')}</option>
+                          <option value="pro">{t('pro')}</option>
                           <option value="enterprise">Bespoke Chain (Enterprise)</option>
                         </select>
                       </div>
                       <div className="form-group">
-                        <label>Max Active Students</label>
+                        <label>{t('maxActiveStudents')}</label>
                         <input 
                           type="number" 
                           className="form-control" 
@@ -882,7 +1132,7 @@ export default function App() {
                         />
                       </div>
                       <div className="form-group">
-                        <label>Storage Quota (GB)</label>
+                        <label>{t('storageQuotaGb')}</label>
                         <input 
                           type="number" 
                           className="form-control" 
@@ -892,32 +1142,32 @@ export default function App() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '12px' }}>
-                      <button type="submit" className="btn btn-outline-primary">Apply Changes</button>
-                      <button type="button" className="btn btn-outline-danger" onClick={() => setEditingOrg(null)}>Cancel</button>
+                      <button type="submit" className="btn btn-outline-primary">{t('applyChanges')}</button>
+                      <button type="button" className="btn btn-outline-danger" onClick={() => setEditingOrg(null)}>{t('cancel')}</button>
                     </div>
                   </form>
                 </div>
               ) : (
                 <div className="glass-card">
                   <div className="card-title">
-                    <CreditCard size={20} color="#a855f7" />
-                    <span>Resource & Licensing Controls</span>
+                    <CreditCard size={20} color="#6366f1" />
+                    <span>{t('resourceLicensingControls')}</span>
                   </div>
                   <table className="tenant-table">
                     <thead>
                       <tr>
-                        <th>Organization Name</th>
-                        <th>Plan</th>
-                        <th>Student Limit</th>
-                        <th>Storage Limit</th>
-                        <th>Actions</th>
+                        <th>{t('tenantName')}</th>
+                        <th>{t('billingPlan')}</th>
+                        <th>{t('studentLimit')}</th>
+                        <th>{t('storageLimit')}</th>
+                        <th>{t('actions')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {orgs.map((org: any) => (
                         <tr key={org.id}>
-                          <td style={{ color: 'white', fontWeight: '500' }}>{org.name}</td>
-                          <td><span className={`badge ${org.billingPlan}`}>{org.billingPlan}</span></td>
+                          <td style={{ color: '#0f172a', fontWeight: '500' }}>{org.name}</td>
+                          <td><span className={`badge ${org.billingPlan}`}>{t(org.billingPlan)}</span></td>
                           <td>{org.settings.studentQuota || 100} students</td>
                           <td>{org.settings.storageQuotaGb || 10} GB</td>
                           <td>
@@ -930,7 +1180,7 @@ export default function App() {
                                 setQuotaStorage(org.settings.storageQuotaGb || 10);
                               }}
                             >
-                              Configure Limits
+                              {t('configureLimits')}
                             </button>
                           </td>
                         </tr>
@@ -946,17 +1196,17 @@ export default function App() {
           {activeTab === 'flags' && (
             <div className="glass-card">
               <div className="card-title">
-                <Flag size={20} color="#f59e0b" />
-                <span>Global System Overrides</span>
+                <Flag size={20} color="#6366f1" />
+                <span>{t('globalSystemOverrides')}</span>
               </div>
               <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '24px' }}>
-                These settings enforce global environment overrides directly in the backend cache layer. Changes take effect instantly system-wide.
+                {t('globalOverridesDesc')}
               </p>
 
               <div className="flag-row">
                 <div>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#fff' }}>Row Level Security (RLS) Policies</h4>
-                  <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>Toggle DB multi-tenant isolation layers</p>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#0f172a' }}>{t('rlsTitle')}</h4>
+                  <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>{t('rlsDesc')}</p>
                 </div>
                 <label className="switch">
                   <input 
@@ -970,8 +1220,8 @@ export default function App() {
 
               <div className="flag-row">
                 <div>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#fff' }}>AI & Speech Assessment Engine</h4>
-                  <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>Turn on/off speech pronunciation features globally</p>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#0f172a' }}>{t('aiTitle')}</h4>
+                  <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>{t('aiDesc')}</p>
                 </div>
                 <label className="switch">
                   <input 
@@ -985,8 +1235,8 @@ export default function App() {
 
               <div className="flag-row">
                 <div>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#fff' }}>Enable GenAI Support Copilots</h4>
-                  <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>Toggles LLM components in Student LMS</p>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#0f172a' }}>{t('genAiTitle')}</h4>
+                  <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>{t('genAiDesc')}</p>
                 </div>
                 <label className="switch">
                   <input 
@@ -1000,8 +1250,8 @@ export default function App() {
 
               <div className="flag-row">
                 <div>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#fff' }}>Global Maintenance Mode</h4>
-                  <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>Restricts all client app requests to static maintenance view</p>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#0f172a' }}>{t('maintenanceTitle')}</h4>
+                  <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>{t('maintenanceDesc')}</p>
                 </div>
                 <label className="switch">
                   <input 
@@ -1019,24 +1269,24 @@ export default function App() {
           {activeTab === 'support' && (
             <div className="glass-card">
               <div className="card-title">
-                <UserCheck size={20} color="#10b981" />
-                <span>Audited Support Access Mode</span>
+                <UserCheck size={20} color="#6366f1" />
+                <span>{t('auditedSupportTitle')}</span>
               </div>
               <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '24px' }}>
-                For security reasons, any platform admin entering the workspace of a tenant is logged. The audit record is immutable and stored permanently.
+                {t('auditedSupportDesc')}
               </p>
 
               <form onSubmit={triggerImpersonation} style={{ maxWidth: '600px' }}>
                 <div className="form-group">
-                  <label>Select Target Organization</label>
+                  <label>{t('selectTargetOrg')}</label>
                   <select 
                     className="form-control"
                     value={impersonateOrgId}
                     onChange={(e: any) => setImpersonateOrgId(e.target.value)}
-                    style={{ background: '#1e293b' }}
+                    style={{ background: '#ffffff', color: '#0f172a' }}
                     required
                   >
-                    <option value="">-- Choose Tenant --</option>
+                    <option value="">{t('chooseTenant')}</option>
                     {orgs.map((o: any) => (
                       <option key={o.id} value={o.id}>{o.name}</option>
                     ))}
@@ -1044,7 +1294,7 @@ export default function App() {
                 </div>
 
                 <div className="form-group" style={{ marginTop: '16px' }}>
-                  <label>Target User ID (UUID)</label>
+                  <label>{t('targetUserId')}</label>
                   <input 
                     type="text"
                     required
@@ -1056,15 +1306,15 @@ export default function App() {
                 </div>
 
                 <div className="form-group" style={{ marginTop: '16px' }}>
-                  <label>Reason for Session Impersonation</label>
+                  <label>{t('reasonImpersonation')}</label>
                   <textarea 
                     required
                     className="form-control"
                     rows={4}
-                    placeholder="Explain why client data access is needed (ticket reference, database error, billing audit)..."
+                    placeholder={t('reasonPlaceholder')}
                     value={impersonateReason}
                     onChange={(e: any) => setImpersonateReason(e.target.value)}
-                    style={{ resize: 'none', background: 'rgba(0,0,0,0.1)' }}
+                    style={{ resize: 'none', background: '#ffffff', color: '#0f172a' }}
                   />
                 </div>
 
@@ -1074,7 +1324,7 @@ export default function App() {
                   style={{ marginTop: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}
                 >
                   <ShieldAlert size={16} />
-                  Authorize & Log Support Session
+                  {t('authorizeImpersonation')}
                 </button>
               </form>
             </div>
@@ -1086,21 +1336,21 @@ export default function App() {
               <div className="grid-2">
                 <div className="glass-card">
                   <div className="card-title">
-                    <Activity size={20} color="#ec4899" />
-                    <span>Database Status</span>
+                    <Activity size={20} color="#6366f1" />
+                    <span>{t('dbStatus')}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div className="metric-card">
-                      <span className="metric-label">Active Connections</span>
+                      <span className="metric-label">{t('activeConnections')}</span>
                       <span className="metric-value">12 / 100</span>
                     </div>
                     <div className="metric-card">
-                      <span className="metric-label">Avg Query Execution</span>
+                      <span className="metric-label">{t('avgQueryExecution')}</span>
                       <span className="metric-value">4.2 ms</span>
                     </div>
                     <div className="metric-card" style={{ gridColumn: 'span 2' }}>
-                      <span className="metric-label">Last Migration Run</span>
-                      <span className="metric-value" style={{ fontSize: '13px', color: '#10b981' }}>
+                      <span className="metric-label">{t('lastMigrationRun')}</span>
+                      <span className="metric-value" style={{ fontSize: '13px', color: '#16a34a' }}>
                         14-July-2026 - Migration v1.0.8 successful
                       </span>
                     </div>
@@ -1109,24 +1359,24 @@ export default function App() {
 
                 <div className="glass-card">
                   <div className="card-title">
-                    <Activity size={20} color="#06b6d4" />
-                    <span>Cache & Job Queues</span>
+                    <Activity size={20} color="#6366f1" />
+                    <span>{t('cacheJobQueues')}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div className="metric-card">
-                      <span className="metric-label">Redis Cache Hits</span>
+                      <span className="metric-label">{t('redisCacheHits')}</span>
                       <span className="metric-value">94.8%</span>
                     </div>
                     <div className="metric-card">
-                      <span className="metric-label">BullMQ Pending Jobs</span>
+                      <span className="metric-label">{t('bullmqPendingJobs')}</span>
                       <span className="metric-value">0</span>
                     </div>
                     <div className="metric-card">
-                      <span className="metric-label">Active Workers</span>
+                      <span className="metric-label">{t('activeWorkers')}</span>
                       <span className="metric-value">4 / 4</span>
                     </div>
                     <div className="metric-card">
-                      <span className="metric-label">Avg Queue Process Time</span>
+                      <span className="metric-label">{t('avgQueueProcessTime')}</span>
                       <span className="metric-value">180 ms</span>
                     </div>
                   </div>
@@ -1135,20 +1385,20 @@ export default function App() {
 
               <div className="glass-card">
                 <div className="card-title">
-                  <ShieldAlert size={20} color="#ef4444" />
-                  <span>Security & Auditing</span>
+                  <ShieldAlert size={20} color="#6366f1" />
+                  <span>{t('securityAuditing')}</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
                   <div className="metric-card">
-                    <span className="metric-label">Audit Logs Recorded (24h)</span>
+                    <span className="metric-label">{t('auditLogs24h')}</span>
                     <span className="metric-value">482</span>
                   </div>
                   <div className="metric-card">
-                    <span className="metric-label">Active Impersonations</span>
-                    <span className="metric-value" style={{ color: '#ef4444' }}>0</span>
+                    <span className="metric-label">{t('activeImpersonations')}</span>
+                    <span className="metric-value" style={{ color: '#dc2626' }}>0</span>
                   </div>
                   <div className="metric-card">
-                    <span className="metric-label">Failed Admin Logins</span>
+                    <span className="metric-label">{t('failedAdminLogins')}</span>
                     <span className="metric-value">0</span>
                   </div>
                 </div>

@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { BullModule } from '@nestjs/bull';
+import { join } from 'path';
 
 // Config
 import { appConfig } from './config/app.config';
@@ -62,7 +63,10 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
     ConfigModule.forRoot({
       isGlobal: true,
       load: [appConfig, databaseConfig, jwtConfig, redisConfig],
-      envFilePath: ['.env.local', '.env'],
+      envFilePath: [
+        join(__dirname, '../../../.env.local'),
+        join(__dirname, '../../../.env'),
+      ],
     }),
 
     // Event system (SDD §6.1)

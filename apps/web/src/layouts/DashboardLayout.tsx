@@ -16,61 +16,67 @@ import {
   Building2,
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth.store';
+import { useTranslation, LanguageSwitcher } from '../providers/LanguageProvider';
 
 const navItems = [
   {
-    section: 'Overview',
+    section: 'overview',
     links: [
-      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { to: '/dashboard', label: 'Dashboard', key: 'dashboard', icon: LayoutDashboard },
     ],
   },
   {
-    section: 'Academic',
+    section: 'academic',
     links: [
-      { to: '/courses', label: 'Courses', icon: BookOpen },
-      { to: '/attendance', label: 'Attendance', icon: ClipboardCheck },
-      { to: '/gradebook', label: 'Gradebook', icon: GraduationCap },
+      { to: '/courses', label: 'Courses', key: 'courses', icon: BookOpen },
+      { to: '/attendance', label: 'Attendance', key: 'attendance', icon: ClipboardCheck },
+      { to: '/gradebook', label: 'Gradebook', key: 'gradebook', icon: GraduationCap },
     ],
   },
   {
-    section: 'Communication',
+    section: 'communication',
     links: [
-      { to: '/messaging', label: 'Messaging', icon: MessageSquare },
-      { to: '/discussions', label: 'Discussions', icon: MessageCircle },
+      { to: '/messaging', label: 'Messaging', key: 'messaging', icon: MessageSquare },
+      { to: '/discussions', label: 'Discussions', key: 'discussions', icon: MessageCircle },
     ],
   },
   {
-    section: 'System',
+    section: 'system',
     links: [
-      { to: '/users', label: 'Users', icon: Users },
-      { to: '/analytics', label: 'Analytics', icon: BarChart3 },
-      { to: '/settings', label: 'Settings', icon: Settings },
+      { to: '/users', label: 'Users', key: 'users', icon: Users },
+      { to: '/analytics', label: 'Analytics', key: 'analytics', icon: BarChart3 },
+      { to: '/settings', label: 'Settings', key: 'settings', icon: Settings },
     ],
   },
   {
-    section: 'Super Admin',
+    section: 'superAdmin',
     links: [
-      { to: '/admin', label: 'Global Dashboard', icon: ShieldAlert },
-      { to: '/admin/organizations', label: 'Organizations', icon: Building2 },
+      { to: '/admin', label: 'Global Dashboard', key: 'globalDashboard', icon: ShieldAlert },
+      { to: '/admin/organizations', label: 'Organizations', key: 'organizations', icon: Building2 },
     ],
   },
 ];
+
 
 export function DashboardLayout() {
   const location = useLocation();
   const whiteLabelConfig = useAuthStore((state: any) => state.whiteLabelConfig);
   const layoutVariant = whiteLabelConfig?.layoutVariant || 'sidebar';
+  const { t } = useTranslation();
 
   const getPageTitle = () => {
     const path = location.pathname.split('/')[1];
     const titles: Record<string, string> = {
-      dashboard: 'Dashboard',
-      courses: 'Courses',
-      attendance: 'Attendance',
-      messaging: 'Messaging',
-      users: 'Users',
-      analytics: 'Analytics',
-      settings: 'Settings',
+      dashboard: t('dashboard'),
+      courses: t('courses'),
+      attendance: t('attendance'),
+      messaging: t('messaging'),
+      gradebook: t('gradebook'),
+      discussions: t('discussions'),
+      users: t('users'),
+      analytics: t('analytics'),
+      settings: t('settings'),
+      admin: t('globalDashboard'),
     };
     return titles[path] || 'CampusOS';
   };
@@ -119,23 +125,24 @@ export function DashboardLayout() {
                     }}
                   >
                     <Icon size={14} />
-                    {link.label}
+                    {t(link.key)}
                   </NavLink>
                 );
               })}
             </nav>
           </div>
 
-          <div className="topbar-right">
+          <div className="topbar-right" style={{ gap: 'var(--space-4)' }}>
             <div className="topbar-search">
               <Search size={16} style={{ color: 'var(--text-tertiary)' }} />
-              <input placeholder="Search..." />
+              <input placeholder={t('searchPlaceholder')} />
             </div>
+            <LanguageSwitcher />
             <button className="btn btn-ghost btn-icon" title="Notifications">
               <Bell size={20} />
             </button>
             <div className="avatar">A</div>
-            <button className="btn btn-ghost btn-icon" title="Logout" style={{ marginLeft: 'var(--space-2)' }}>
+            <button className="btn btn-ghost btn-icon" title={t('logout')} style={{ marginLeft: 'var(--space-2)' }}>
               <LogOut size={16} />
             </button>
           </div>
@@ -164,7 +171,7 @@ export function DashboardLayout() {
         <nav className="sidebar-nav">
           {navItems.map((section) => (
             <div key={section.section} className="sidebar-section">
-              <div className="sidebar-section-title">{section.section}</div>
+              <div className="sidebar-section-title">{t(section.section)}</div>
               {section.links.map((link) => {
                 const Icon = link.icon;
                 return (
@@ -176,7 +183,7 @@ export function DashboardLayout() {
                     }
                   >
                     <Icon />
-                    {link.label}
+                    {t(link.key)}
                   </NavLink>
                 );
               })}
@@ -208,9 +215,10 @@ export function DashboardLayout() {
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
+                  color: 'var(--text-primary)',
                 }}
               >
-                Admin User
+                {t('adminUser')}
               </div>
               <div
                 style={{
@@ -221,7 +229,7 @@ export function DashboardLayout() {
                 admin@campus.edu
               </div>
             </div>
-            <button className="btn btn-ghost btn-icon" title="Logout">
+            <button className="btn btn-ghost btn-icon" title={t('logout')}>
               <LogOut size={16} />
             </button>
           </div>
@@ -233,12 +241,13 @@ export function DashboardLayout() {
         <div className="topbar-left">
           <h2 className="topbar-title">{getPageTitle()}</h2>
         </div>
-        <div className="topbar-right">
+        <div className="topbar-right" style={{ gap: 'var(--space-4)' }}>
           <div className="topbar-search">
             <Search size={16} style={{ color: 'var(--text-tertiary)' }} />
-            <input placeholder="Search anything..." />
+            <input placeholder={t('searchPlaceholder')} />
             <kbd>⌘K</kbd>
           </div>
+          <LanguageSwitcher />
           <button className="btn btn-ghost btn-icon" title="Notifications">
             <Bell size={20} />
           </button>
