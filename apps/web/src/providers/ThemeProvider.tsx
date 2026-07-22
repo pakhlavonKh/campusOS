@@ -36,7 +36,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
           localStorage.setItem('tenant-slug', slug);
         }
 
-        const response = await fetch(`/api/organizations/${slug}/white-label/public`);
+        const response = await fetch(`/api/v1/organizations/${slug}/white-label/public`);
         if (!response.ok) {
           throw new Error('Failed to resolve white-label configuration');
         }

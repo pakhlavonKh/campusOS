@@ -5,9 +5,10 @@
   "description": "CampusOS — Subject-Agnostic Education Operating System",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --filter=!@campusos/mobile",
     "dev:backend": "turbo run dev --filter=@campusos/backend",
     "dev:web": "turbo run dev --filter=@campusos/web",
+    "dev:mobile": "turbo run dev --filter=@campusos/mobile",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
     "test": "turbo run test",
@@ -17,6 +18,7 @@
     "clean": "turbo run clean",
     "db:migrate": "pnpm --filter @campusos/backend run migration:run",
     "db:seed": "pnpm --filter @campusos/backend run seed",
+    "create-org-app": "node scripts/create-org-app.js",
     "prepare": "echo 'husky install'"
   },
   "engines": {

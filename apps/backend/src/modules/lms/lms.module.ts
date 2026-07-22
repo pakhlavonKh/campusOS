@@ -8,6 +8,7 @@ import {
   Section, Unit, Topic, CourseTemplate, Prerequisite, ReusableBlock,
 } from './entities/lms.entity';
 import { CourseService } from './services/course.service';
+import { CompletionService } from './services/completion.service';
 import { CourseController } from './controllers/course.controller';
 
 @Module({
@@ -20,7 +21,7 @@ import { CourseController } from './controllers/course.controller';
     ]),
   ],
   controllers: [CourseController],
-  providers: [CourseService],
-  exports: [CourseService, TypeOrmModule],
+  providers: [CourseService, CompletionService],
+  exports: [CourseService, CompletionService, TypeOrmModule],
 })
 export class LmsModule {}

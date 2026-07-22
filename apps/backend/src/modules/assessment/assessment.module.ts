@@ -15,6 +15,10 @@ import {
 import { AssessmentService } from './services/assessment.service';
 import { AssessmentController } from './controllers/assessment.controller';
 
+import { BullModule } from '@nestjs/bull';
+import { QuizDeliveryService } from './services/quiz-delivery.service';
+import { RealtimeModule } from '../../shared/gateways/realtime.module';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -24,9 +28,13 @@ import { AssessmentController } from './controllers/assessment.controller';
       AntiCheatConfiguration, AntiCheatLog,
       Assessment, AssessmentQuestion, AssessmentAttempt,
     ]),
+    BullModule.registerQueue({
+      name: 'quiz-timeout',
+    }),
+    RealtimeModule,
   ],
   controllers: [AssessmentController],
-  providers: [AssessmentService],
-  exports: [AssessmentService, TypeOrmModule],
+  providers: [AssessmentService, QuizDeliveryService],
+  exports: [AssessmentService, QuizDeliveryService, TypeOrmModule],
 })
 export class AssessmentModule {}

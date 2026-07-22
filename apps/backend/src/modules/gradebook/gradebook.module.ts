@@ -7,6 +7,7 @@ import {
   ReportCard, Transcript,
 } from './entities/gradebook.entity';
 import { GradebookService } from './services/gradebook.service';
+import { GradeCalculationService } from './services/grade-calculation.service';
 import { GradebookController } from './controllers/gradebook.controller';
 
 @Module({
@@ -19,7 +20,7 @@ import { GradebookController } from './controllers/gradebook.controller';
     ]),
   ],
   controllers: [GradebookController],
-  providers: [GradebookService],
-  exports: [GradebookService, TypeOrmModule],
+  providers: [GradebookService, GradeCalculationService],
+  exports: [GradebookService, GradeCalculationService, TypeOrmModule],
 })
 export class GradebookModule {}

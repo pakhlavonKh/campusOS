@@ -26,6 +26,7 @@ import { Role, RolePermission, Permission, MembershipRole } from '../rbac/entiti
 
 // Services and controllers
 import { AuthService } from './services/auth.service';
+import { MfaService } from './services/mfa.service';
 import { AuthController } from './controllers/auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
@@ -55,7 +56,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('jwt.secret'),
+        secret: configService.get<string>('jwt.secret') || 'supersecret',
         signOptions: {
           expiresIn: configService.get<string>('jwt.accessTokenExpiry', '15m'),
         },
@@ -63,7 +64,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [AuthService, JwtModule, PassportModule],
+  providers: [AuthService, MfaService, JwtStrategy],
+  exports: [AuthService, MfaService, JwtModule, PassportModule],
 })
 export class AuthModule {}

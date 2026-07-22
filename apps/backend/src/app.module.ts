@@ -54,6 +54,12 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { PlatformGuard } from './common/guards/platform.guard';
 
+import { RealtimeModule } from './shared/gateways/realtime.module';
+import { TenantContextSubscriber } from './shared/subscribers/tenant-context.subscriber';
+import { TenantMiddleware } from './shared/middleware/tenant.middleware';
+import { MfaRequiredGuard } from './common/guards/mfa-required.guard';
+import { MiddlewareConsumer, NestModule } from '@nestjs/common';
+
 // Interceptors
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 
@@ -111,6 +117,9 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
     // Global Caching module
     CacheModule,
 
+    // Real-time WebSockets
+    RealtimeModule,
+
     // ─── Core Layer ───
     AuthModule,
     UsersModule,
@@ -150,6 +159,7 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
     PaymentsModule,
   ],
   providers: [
+    TenantContextSubscriber,
     {
       provide: APP_INTERCEPTOR,
       useClass: AuditInterceptor,
@@ -158,6 +168,14 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
       provide: APP_GUARD,
       useClass: PlatformGuard,
     },
+    {
+      provide: APP_GUARD,
+      useClass: MfaRequiredGuard,
+    },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(TenantMiddleware).forRoutes('*');
+  }
+}

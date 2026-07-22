@@ -1,10 +1,10 @@
-name: CampusOS CI
+name: CampusOS CI — Lint, Typecheck, Unit Tests & Build Guard
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
 
 jobs:
   build-and-test:
@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        fetch-depth: 2 # needed for turborepo to diff correctly
+        fetch-depth: 2
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -48,7 +48,17 @@ jobs:
     - name: Type Check
       run: pnpm run type-check
 
-    - name: Test (Unit & E2E)
+    - name: GAP-SEC-02 — Platform Build Guard
+      run: |
+        echo "Checking customer apps (web, mobile, desktop) for platform super admin leakage..."
+        if grep -rE "(/admin|/platform/v1|platform_super_admin)" apps/web/src apps/mobile/src 2>/dev/null; then
+          echo "❌ CRITICAL ERROR: Super Admin code/route found inside customer application!"
+          exit 1
+        else
+          echo "✅ Build guard passed: No super admin surface found in customer apps."
+        fi
+
+    - name: Test (Unit & Integration)
       run: pnpm run test
 
     - name: Build

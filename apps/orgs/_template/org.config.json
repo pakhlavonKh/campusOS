@@ -1,0 +1,13 @@
+{
+  "tenantId": "{{tenantId}}",
+  "name": "{{name}}",
+  "apiUrl": "{{apiUrl}}",
+  "tokens": {
+    "colorPrimary": "{{colorPrimary}}",
+    "colorSecondary": "{{colorSecondary}}",
+    "fontFamily": "Inter",
+    "logoUrl": null,
+    "faviconUrl": null,
+    "customDomain": null
+  }
+}

@@ -1,0 +1,45 @@
+name: Tier 3 Org App Package Drift Check
+
+on:
+  schedule:
+    # Run every Monday at 08:00 UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+jobs:
+  check-drift:
+    name: Check Packages UI/SDK Drift Across Provisioned Org Apps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit Org App Shared Package Versions
+        run: |
+          node -e "
+          const fs = require('fs');
+          const path = require('path');
+          const orgsDir = path.join(process.cwd(), 'apps', 'orgs');
+          if (!fs.existsSync(orgsDir)) {
+            console.log('No Tier 3 org apps provisioned yet.');
+            process.exit(0);
+          }
+          const apps = fs.readdirSync(orgsDir).filter(f => fs.statSync(path.join(orgsDir, f)).isDirectory());
+          console.log(\`Auditing \${apps.length} Tier 3 applications...\`);
+          apps.forEach(app => {
+            const pkgPath = path.join(orgsDir, app, 'package.json');
+            if (fs.existsSync(pkgPath)) {
+              const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+              console.log(\`App [\${app}]: @campusos/ui = \${pkg.dependencies?.['@campusos/ui'] || 'missing'}, @campusos/sdk = \${pkg.dependencies?.['@campusos/sdk'] || 'missing'}\`);
+            }
+          });
+          "

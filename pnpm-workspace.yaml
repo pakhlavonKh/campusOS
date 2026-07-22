@@ -1,3 +1,5 @@
 packages:
   - 'apps/*'
+  - 'apps/orgs/*'
+  - '!apps/orgs/_template'
   - 'packages/*'

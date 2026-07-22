@@ -9,6 +9,8 @@ import {
   Reward, ParentReward,
 } from './entities/gamification.entity';
 
+import { GamificationListenerService } from './services/gamification-listener.service';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -20,6 +22,7 @@ import {
       Reward, ParentReward,
     ]),
   ],
-  exports: [TypeOrmModule],
+  providers: [GamificationListenerService],
+  exports: [GamificationListenerService, TypeOrmModule],
 })
 export class GamificationModule {}

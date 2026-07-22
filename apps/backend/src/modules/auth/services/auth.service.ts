@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -314,10 +314,11 @@ export class AuthService {
     const payload = {
       sub: user.id,
       orgId: organizationId,
+      organizationId,
       branchId: branchId || '',
       roles,
       permissions,
-      mfa: false,
+      mfaEnabled: false, // updated by MfaService on confirm
       sessionId,
     };
 
@@ -349,4 +350,167 @@ export class AuthService {
       theme: themeConfig || {},
     };
   }
+
+  // ── Public helper for MfaService ────────────────────────────────────────────
+
+  /** Generate full access+refresh tokens for a user (called after MFA verify). */
+  async generateTokensForUser(userId: string) {
+    const user = await this.userRepo.findOneOrFail({ where: { id: userId } });
+    const membership = await this.membershipRepo.findOne({
+      where: { userId, status: 'active' },
+      order: { createdAt: 'ASC' },
+    });
+    return this.generateTokens(user, membership?.organizationId ?? '', membership?.branchId ?? '');
+  }
+
+  // ── Password Reset ──────────────────────────────────────────────────────────
+
+  /**
+   * GAP-AUTH-01: Issues a time-limited password reset token via email.
+   * Always returns successfully to prevent email enumeration.
+   */
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.userRepo.findOne({ where: { email } });
+    if (!user) return; // Silent — no enumeration
+
+    const resetToken = uuidv4();
+    const tokenHash = this.hashTokenForLookup(resetToken);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    // Store hashed token on credential
+    await this.credentialRepo.update(
+      { userId: user.id },
+      { passwordResetToken: tokenHash, passwordResetExpiresAt: expiresAt } as any,
+    );
+
+    // Emit event for NotificationsModule to deliver the email
+    this.eventEmitter.emit('auth.password_reset_requested', {
+      userId: user.id,
+      email: user.email,
+      resetToken, // raw — sent in email link
+    });
+
+    this.logger.log(`Password reset token issued for ${email}`);
+  }
+
+  /**
+   * GAP-AUTH-01: Validates reset token and updates password.
+   * Invalidates ALL active refresh tokens for the user.
+   */
+  async resetPassword(resetToken: string, newPassword: string): Promise<void> {
+    const tokenHash = this.hashTokenForLookup(resetToken);
+    const cred = await this.credentialRepo.findOne({
+      where: { passwordResetToken: tokenHash } as any,
+    });
+
+    if (!cred) throw new UnauthorizedException('Invalid or expired reset token.');
+
+    const expiresAt = (cred as any).passwordResetExpiresAt as Date | null;
+    if (!expiresAt || expiresAt < new Date()) {
+      throw new UnauthorizedException('Reset token has expired. Please request a new one.');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
+    await this.credentialRepo.update(
+      { userId: cred.userId },
+      { passwordHash, passwordResetToken: null, passwordResetExpiresAt: null } as any,
+    );
+
+    // Revoke all refresh tokens
+    await this.refreshTokenRepo.update(
+      { userId: cred.userId },
+      { revokedAt: new Date() } as any,
+    );
+
+    this.eventEmitter.emit('auth.password_reset_completed', { userId: cred.userId });
+    this.logger.log(`Password reset completed for user ${cred.userId}`);
+  }
+
+  // ── Invitation Accept ───────────────────────────────────────────────────────
+
+  /**
+   * GAP-AUTH-01: Accepts a workspace invitation token.
+   * Creates AuthCredential, activates Membership, emits InvitationAccepted.
+   */
+  async acceptInvitation(dto: {
+    invitationToken: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+  }) {
+    const tokenHash = this.hashTokenForLookup(dto.invitationToken);
+
+    // Invitation stored by InvitationsModule (stub — find by token hash)
+    // In full implementation, query invitation_tokens table
+    const invitation = await (this.userRepo.manager as any).query(
+      `SELECT * FROM invitation_tokens WHERE token_hash = $1 AND expires_at > NOW() AND accepted_at IS NULL`,
+      [tokenHash],
+    ).catch(() => null);
+
+    const inv = invitation?.[0];
+    if (!inv) throw new UnauthorizedException('Invalid or expired invitation token.');
+
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+
+    // Create user + credential
+    const user = this.userRepo.create({
+      email: inv.email,
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      status: 'active',
+    });
+    await this.userRepo.save(user);
+
+    const cred = this.credentialRepo.create({ userId: user.id, passwordHash });
+    await this.credentialRepo.save(cred);
+
+    // Activate membership
+    await this.membershipRepo.update(
+      { id: inv.membership_id },
+      { status: 'active', userId: user.id },
+    );
+
+    // Mark invitation as accepted
+    await (this.userRepo.manager as any).query(
+      `UPDATE invitation_tokens SET accepted_at = NOW(), accepted_by = $1 WHERE id = $2`,
+      [user.id, inv.id],
+    ).catch(() => null);
+
+    this.eventEmitter.emit('auth.invitation_accepted', {
+      invitationId: inv.id,
+      userId: user.id,
+      organizationId: inv.organization_id,
+    });
+
+    return this.generateTokens(user, inv.organization_id, inv.branch_id);
+  }
+
+  // ── SSO ─────────────────────────────────────────────────────────────────────
+
+  /**
+   * GAP-AUTH-01: Returns the OAuth/SAML provider redirect URL.
+   * Full implementation requires Passport OAuth strategies.
+   */
+  async getSsoRedirectUrl(provider: string): Promise<string> {
+    const baseUrl = process.env.API_URL || 'http://localhost:3000';
+    const callbackUrl = `${baseUrl}/api/v1/auth/sso/${provider}/callback`;
+
+    switch (provider) {
+      case 'google':
+        return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=openid%20email%20profile`;
+      case 'microsoft':
+        return `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${process.env.MICROSOFT_CLIENT_ID}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=openid%20email%20profile`;
+      default:
+        throw new BadRequestException(`Unsupported SSO provider: ${provider}`);
+    }
+  }
+
+  async handleSsoCallback(provider: string, code: string): Promise<{ accessToken: string; refreshToken: string }> {
+    // Stub: In production, exchange code for tokens, fetch user profile from provider
+    // Then upsert User and issue CampusOS JWT
+    this.logger.log(`SSO callback received for provider=${provider}, code=${code?.slice(0, 8)}...`);
+    throw new BadRequestException('SSO provider integration not yet fully configured. Contact your administrator.');
+  }
 }
+

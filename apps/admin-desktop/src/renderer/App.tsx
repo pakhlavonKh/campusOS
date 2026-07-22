@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Building2, 
-  CreditCard, 
-  Flag, 
-  UserCheck, 
-  Activity, 
-  ShieldAlert, 
-  LogOut, 
-  Search, 
-  Sliders, 
-  Loader2,
-  CheckCircle,
-  AlertTriangle
-} from 'lucide-react';
+import { Building2, CreditCard, Flag, UserCheck, Activity, ShieldAlert, LogOut, Loader2 } from 'lucide-react';
+import './index.css';
 
-// Declarations for Electron IPC APIS exposed in preload
+// Components
+import { LangSwitcher } from './components/LangSwitcher';
+import { Toast } from './components/Toast';
+
+// Pages
+import { OrgsPage } from './pages/OrgsPage';
+import { BillingPage } from './pages/BillingPage';
+import { FlagsPage } from './pages/FlagsPage';
+import { SupportPage } from './pages/SupportPage';
+import { HealthPage } from './pages/HealthPage';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 interface ElectronAPI {
   minimizeWindow: () => void;
   maximizeWindow: () => void;
@@ -25,12 +25,9 @@ interface ElectronAPI {
 }
 
 declare global {
-  interface Window {
-    electronAPI?: ElectronAPI;
-  }
+  interface Window { electronAPI?: ElectronAPI; }
 }
 
-// Interfaces matching backend entities
 interface Organization {
   id: string;
   name: string;
@@ -41,325 +38,370 @@ interface Organization {
   createdAt: string;
 }
 
+type Tab = 'orgs' | 'billing' | 'flags' | 'support' | 'health';
+type Lang = 'en' | 'ru' | 'uz';
+
+interface GlobalFlags {
+  enableAIModule: boolean;
+  enableRLSPolicies: boolean;
+  maintenanceMode: boolean;
+  enableSpeechScoring: boolean;
+}
+
+// ─── i18n Dictionary ─────────────────────────────────────────────────────────
+
+const I18N: Record<Lang, Record<string, string>> = {
+  en: {
+    consoleTitle: 'Platform Super Admin',
+    accessRestricted: 'Access-restricted internal platform console',
+    emailLabel: 'Email Address',
+    passwordLabel: 'Password',
+    signInBtn: 'Sign In to Console',
+    signingIn: 'Signing In…',
+    orgManagement: 'Organization Management',
+    billingQuotas: 'Billing & Quotas',
+    featureFlags: 'Global Feature Flags',
+    impersonation: 'Support Impersonation',
+    systemHealth: 'System Health',
+    logout: 'Sign Out',
+    serverOnline: 'Server Online',
+    activeTenants: 'Active Tenancies',
+    tenantName: 'Tenant Name',
+    slugIdentifier: 'Slug',
+    billingPlan: 'Billing Plan',
+    status: 'Status',
+    createdDate: 'Created',
+    securityControl: 'Actions',
+    suspendTenant: 'Suspend',
+    activateTenant: 'Activate',
+    quotaOverrides: 'Edit Quota Overrides',
+    billingPlanTier: 'Billing Plan Tier',
+    maxActiveStudents: 'Max Active Students',
+    storageQuotaGb: 'Storage Quota (GB)',
+    applyChanges: 'Apply Changes',
+    cancel: 'Cancel',
+    resourceLicensingControls: 'Resource & Licensing Controls',
+    studentLimit: 'Student Limit',
+    storageLimit: 'Storage Limit',
+    configureLimits: 'Configure Limits',
+    globalSystemOverrides: 'Global System Overrides',
+    globalOverridesDesc: 'These settings push global environment overrides directly into the backend cache layer. Changes take effect system-wide immediately.',
+    rlsTitle: 'Row-Level Security (RLS) Policies',
+    rlsDesc: 'Toggle DB-level multi-tenant isolation layers',
+    aiTitle: 'AI & Speech Assessment Engine',
+    aiDesc: 'Enable/disable speech pronunciation scoring globally',
+    genAiTitle: 'GenAI Support Copilots',
+    genAiDesc: 'Toggle LLM components in the student LMS experience',
+    maintenanceTitle: 'Global Maintenance Mode',
+    maintenanceDesc: 'Redirect all client app requests to a static maintenance view',
+    auditedSupportTitle: 'Audited Support Access Mode',
+    auditedSupportDesc: 'Any platform admin entering a tenant workspace is logged. The audit record is immutable and stored permanently.',
+    selectTargetOrg: 'Select Target Organization',
+    chooseTenant: '— Choose Tenant —',
+    targetUserId: 'Target User ID (UUID)',
+    reasonImpersonation: 'Reason for Impersonation',
+    reasonPlaceholder: 'Explain why client data access is needed (ticket reference, database error, billing audit)…',
+    authorizeImpersonation: 'Authorize & Log Support Session',
+    dbStatus: 'Database Status',
+    activeConnections: 'Active Connections',
+    avgQueryExecution: 'Avg Query Execution',
+    lastMigrationRun: 'Last Migration Run',
+    cacheJobQueues: 'Cache & Job Queues',
+    redisCacheHits: 'Redis Cache Hits',
+    bullmqPendingJobs: 'BullMQ Pending Jobs',
+    activeWorkers: 'Active Workers',
+    avgQueueProcessTime: 'Avg Queue Process Time',
+    securityAuditing: 'Security & Auditing',
+    auditLogs24h: 'Audit Logs (24h)',
+    activeImpersonations: 'Active Impersonations',
+    failedAdminLogins: 'Failed Admin Logins',
+    versionText: 'Console',
+    free: 'Free', growth: 'Growth', pro: 'Pro', actions: 'Actions',
+  },
+  ru: {
+    consoleTitle: 'Панель супер-администратора',
+    accessRestricted: 'Доступ ограничен внутренним пультом управления',
+    emailLabel: 'Электронная почта',
+    passwordLabel: 'Пароль',
+    signInBtn: 'Войти в панель',
+    signingIn: 'Вход…',
+    orgManagement: 'Управление организациями',
+    billingQuotas: 'Тарифы и квоты',
+    featureFlags: 'Глобальные функции',
+    impersonation: 'Поддержка и сессии',
+    systemHealth: 'Здоровье системы',
+    logout: 'Выйти',
+    serverOnline: 'Сервер онлайн',
+    activeTenants: 'Активные клиенты',
+    tenantName: 'Название организации',
+    slugIdentifier: 'Slug',
+    billingPlan: 'Тарифный план',
+    status: 'Статус',
+    createdDate: 'Создан',
+    securityControl: 'Действия',
+    suspendTenant: 'Приостановить',
+    activateTenant: 'Активировать',
+    quotaOverrides: 'Редактировать лимиты',
+    billingPlanTier: 'Уровень тарифа',
+    maxActiveStudents: 'Макс. активных студентов',
+    storageQuotaGb: 'Квота хранилища (ГБ)',
+    applyChanges: 'Применить',
+    cancel: 'Отмена',
+    resourceLicensingControls: 'Ресурсы и лицензирование',
+    studentLimit: 'Лимит студентов',
+    storageLimit: 'Лимит хранилища',
+    configureLimits: 'Настроить лимиты',
+    globalSystemOverrides: 'Глобальные настройки системы',
+    globalOverridesDesc: 'Эти настройки применяют глобальные переменные окружения напрямую в кэш-слой бэкенда. Изменения вступают в силу мгновенно.',
+    rlsTitle: 'Политики RLS (Row-Level Security)',
+    rlsDesc: 'Включение многоарендной изоляции на уровне БД',
+    aiTitle: 'Движок оценки речи и ИИ',
+    aiDesc: 'Включение глобального оценивания произношения',
+    genAiTitle: 'GenAI-ассистенты',
+    genAiDesc: 'Переключает компоненты ИИ в личном кабинете студента',
+    maintenanceTitle: 'Режим обслуживания',
+    maintenanceDesc: 'Перенаправляет все запросы на страницу обслуживания',
+    auditedSupportTitle: 'Поддержка с аудитом доступа',
+    auditedSupportDesc: 'Вход администраторов в пространства клиентов логируется. Запись аудита неизменяема.',
+    selectTargetOrg: 'Выберите организацию',
+    chooseTenant: '— Выберите клиента —',
+    targetUserId: 'ID пользователя (UUID)',
+    reasonImpersonation: 'Причина входа',
+    reasonPlaceholder: 'Опишите причину доступа к данным клиента (номер тикета, ошибка в БД, аудит биллинга)…',
+    authorizeImpersonation: 'Авторизовать и логировать сессию',
+    dbStatus: 'Статус базы данных',
+    activeConnections: 'Активные соединения',
+    avgQueryExecution: 'Ср. время запроса',
+    lastMigrationRun: 'Последняя миграция',
+    cacheJobQueues: 'Кэш и очереди задач',
+    redisCacheHits: 'Хит-рейт кэша Redis',
+    bullmqPendingJobs: 'Ожидающие задачи BullMQ',
+    activeWorkers: 'Активные воркеры',
+    avgQueueProcessTime: 'Ср. время обработки',
+    securityAuditing: 'Аудит и безопасность',
+    auditLogs24h: 'Логи аудита (24ч)',
+    activeImpersonations: 'Активные сессии',
+    failedAdminLogins: 'Ошибки входа',
+    versionText: 'Консоль',
+    free: 'Бесплатный', growth: 'Рост', pro: 'Про', actions: 'Действия',
+  },
+  uz: {
+    consoleTitle: 'Super Admin Boshqaruv Paneli',
+    accessRestricted: 'Kirish cheklangan ichki tizim konsoli',
+    emailLabel: 'Elektron pochta',
+    passwordLabel: 'Parol',
+    signInBtn: 'Konsolga kirish',
+    signingIn: 'Kirilmoqda…',
+    orgManagement: 'Tashkilotlarni boshqarish',
+    billingQuotas: 'Tariflar va limitlar',
+    featureFlags: 'Global funksiyalar',
+    impersonation: 'Impersonatsiya',
+    systemHealth: 'Tizim salomatligi',
+    logout: 'Chiqish',
+    serverOnline: 'Server onlayn',
+    activeTenants: 'Faol mijozlar',
+    tenantName: 'Tashkilot nomi',
+    slugIdentifier: 'Slug',
+    billingPlan: 'Tarif rejasi',
+    status: 'Holat',
+    createdDate: 'Yaratilgan',
+    securityControl: 'Amallar',
+    suspendTenant: "To'xtatish",
+    activateTenant: 'Faollashtirish',
+    quotaOverrides: 'Limitlarni tahrirlash',
+    billingPlanTier: 'Tarif darajasi',
+    maxActiveStudents: 'Maks. faol talabalar',
+    storageQuotaGb: 'Xotira limiti (GB)',
+    applyChanges: "O'zgarishlarni saqlash",
+    cancel: 'Bekor qilish',
+    resourceLicensingControls: 'Resurs va litsenziya nazorati',
+    studentLimit: 'Talabalar limiti',
+    storageLimit: 'Xotira limiti',
+    configureLimits: 'Limitlarni sozlash',
+    globalSystemOverrides: 'Global tizim sozlamalari',
+    globalOverridesDesc: "Ushbu sozlamalar global qiymatlarni to'g'ridan-to'g'ri kesh qatlamida o'zgartiradi. O'zgarishlar darhol kuchga kiradi.",
+    rlsTitle: 'Qator darajasidagi xavfsizlik (RLS)',
+    rlsDesc: "Bazada ko'p ijarali ajratish siyosatini yoqish",
+    aiTitle: "Sun'iy intellekt va nutqni baholash",
+    aiDesc: 'Nutq talaffuzini baholash xizmatini yoqish',
+    genAiTitle: "GenAI yordamchilarini yoqish",
+    genAiDesc: "LMS talabalar interfeysida sun'iy intellektni yoqadi",
+    maintenanceTitle: 'Global texnik xizmat rejimi',
+    maintenanceDesc: "Barcha mijoz so'rovlarini texnik xizmat sahifasiga yo'naltiradi",
+    auditedSupportTitle: "Audit qilinadigan qo'llab-quvvatlash",
+    auditedSupportDesc: 'Administratorning mijoz maydoniga kirishi qayd etiladi. Ushbu yozuv doimiydir.',
+    selectTargetOrg: 'Tashkilotni tanlang',
+    chooseTenant: '— Mijozni tanlang —',
+    targetUserId: 'Foydalanuvchi ID (UUID)',
+    reasonImpersonation: 'Kirish sababi',
+    reasonPlaceholder: "Mijoz ma'lumotlariga kirish sababini tushuntiring…",
+    authorizeImpersonation: 'Avtorizatsiya qilish va seansni yozish',
+    dbStatus: "Ma'lumotlar bazasi holati",
+    activeConnections: 'Faol aloqalar',
+    avgQueryExecution: "O'rtacha so'rov vaqti",
+    lastMigrationRun: "So'nggi migratsiya",
+    cacheJobQueues: 'Kesh va navbatlar',
+    redisCacheHits: 'Redis kesh ko\'rsatkichi',
+    bullmqPendingJobs: 'Kutilayotgan BullMQ vazifalari',
+    activeWorkers: 'Faol ishchilar',
+    avgQueueProcessTime: "O'rtacha navbat vaqti",
+    securityAuditing: 'Xavfsizlik va audit',
+    auditLogs24h: 'Audit yozuvlari (24s)',
+    activeImpersonations: 'Faol impersonatsiyalar',
+    failedAdminLogins: 'Muvaffaqiyatsiz kirishlar',
+    versionText: 'Versiya',
+    free: 'Bepul', growth: "O'sish", pro: 'Pro', actions: 'Amallar',
+  },
+};
+
+// ─── Sidebar Navigation Config ────────────────────────────────────────────────
+
+const NAV_ITEMS: Array<{ id: Tab; labelKey: string; Icon: any }> = [
+  { id: 'orgs',    labelKey: 'orgManagement',  Icon: Building2 },
+  { id: 'billing', labelKey: 'billingQuotas',  Icon: CreditCard },
+  { id: 'flags',   labelKey: 'featureFlags',   Icon: Flag },
+  { id: 'support', labelKey: 'impersonation',  Icon: UserCheck },
+  { id: 'health',  labelKey: 'systemHealth',   Icon: Activity },
+];
+
+// ─── API helpers ──────────────────────────────────────────────────────────────
+
+const BASE = 'http://localhost:3000';
+
+async function apiGet<T>(path: string, token: string): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  return res.json() as Promise<T>;
+}
+
+async function apiPatch(path: string, token: string, body: unknown): Promise<void> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API ${res.status}`);
+}
+
+async function apiPost(path: string, token: string, body: unknown): Promise<void> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API ${res.status}`);
+}
+
+const OFFLINE_ORGS: Organization[] = [
+  { id: 'b6f2fcd0-1845-4bb6-a9bb-0bfa7c90b637', name: 'Standard Institute of Sciences', slug: 'sis-science', status: 'active',    billingPlan: 'growth', settings: { studentQuota: 500,  storageQuotaGb: 50  }, createdAt: '2026-02-14T10:00:00Z' },
+  { id: 'f946358c-dcb9-4a94-b152-cb4db142a781', name: 'Global Languages Academy',       slug: 'gla-edu',    status: 'active',    billingPlan: 'pro',    settings: { studentQuota: 2000, storageQuotaGb: 200 }, createdAt: '2026-04-01T14:32:00Z' },
+  { id: 'c8375ba7-47b8-4d33-bc42-df232ba71ab3', name: 'Beta Test College',              slug: 'beta-coll',  status: 'suspended', billingPlan: 'free',   settings: { studentQuota: 100,  storageQuotaGb: 10  }, createdAt: '2026-06-20T08:15:00Z' },
+];
+
+// ─── App ──────────────────────────────────────────────────────────────────────
+
 export default function App() {
-  const [token, setToken] = useState<string | null>(localStorage.getItem('admin_token'));
+  // Auth
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('admin_token'));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'orgs' | 'billing' | 'flags' | 'support' | 'health'>('orgs');
-  
-  // Dashboard states
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  // Shell state
+  const [activeTab, setActiveTab] = useState<Tab>('orgs');
+  const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('admin_lang') as Lang) || 'en');
+  const [appVersion, setAppVersion] = useState('1.0.0');
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Data
   const [orgs, setOrgs] = useState<Organization[]>([]);
-  const [loadingOrgs, setLoadingOrgs] = useState(false);
-  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-  
-  // Quota editor states
-  const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
-  const [newPlan, setNewPlan] = useState('');
-  const [quotaStudents, setQuotaStudents] = useState(100);
-  const [quotaStorage, setQuotaStorage] = useState(10); // GB
-
-  // Impersonation states
-  const [impersonateOrgId, setImpersonateOrgId] = useState('');
-  const [impersonateUserId, setImpersonateUserId] = useState('');
-  const [impersonateReason, setImpersonateReason] = useState('');
-
-  // Feature flag overrides
-  const [globalFlags, setGlobalFlags] = useState({
+  const [orgsLoading, setOrgsLoading] = useState(false);
+  const [flags, setFlags] = useState<GlobalFlags>({
     enableAIModule: true,
     enableRLSPolicies: true,
     maintenanceMode: false,
     enableSpeechScoring: true,
   });
 
-  // App version
-  const [appVersion, setAppVersion] = useState('1.0.0');
+  // ─── Helpers ────────────────────────────────────────────────────────────────
 
-  // Multi-language state & dictionary
-  const [lang, setLang] = useState<'en' | 'ru' | 'uz'>(() => {
-    return (localStorage.getItem('admin_lang') as 'en' | 'ru' | 'uz') || 'en';
-  });
+  const t = (key: string) => I18N[lang][key] ?? I18N.en[key] ?? key;
 
-  const changeLang = (l: 'en' | 'ru' | 'uz') => {
+  const showToast = (type: 'success' | 'error', text: string) => {
+    setToast({ type, text });
+    setTimeout(() => setToast(null), 5000);
+  };
+
+  const changeLang = (l: Lang) => {
     setLang(l);
     localStorage.setItem('admin_lang', l);
   };
 
-  const localTranslations: Record<'en' | 'ru' | 'uz', Record<string, string>> = {
-    en: {
-      consoleTitle: 'Platform Super Admin',
-      accessRestricted: 'Access restricted internal platform console',
-      emailLabel: 'Email Address',
-      passwordLabel: 'Password',
-      signInBtn: 'Sign In to Console',
-      signingIn: 'Signing In...',
-      orgManagement: 'Organization Management',
-      billingQuotas: 'Billing & Quotas',
-      featureFlags: 'Global Feature Flags',
-      impersonation: 'Support Impersonation',
-      systemHealth: 'System Health',
-      logout: 'Sign Out Console',
-      serverOnline: 'Server Online',
-      activeTenants: 'Active Tenancies',
-      tenantName: 'Tenant Name',
-      slugIdentifier: 'Slug Identifier',
-      billingPlan: 'Billing Plan',
-      status: 'Status',
-      createdDate: 'Created Date',
-      securityControl: 'Security Control',
-      suspendTenant: 'Suspend Tenant',
-      activateTenant: 'Activate Tenant',
-      quotaOverrides: 'Edit Quota Overrides',
-      billingPlanTier: 'Billing Plan Tier',
-      maxActiveStudents: 'Max Active Students',
-      storageQuotaGb: 'Storage Quota (GB)',
-      applyChanges: 'Apply Changes',
-      cancel: 'Cancel',
-      resourceLicensingControls: 'Resource & Licensing Controls',
-      studentLimit: 'Student Limit',
-      storageLimit: 'Storage Limit',
-      configureLimits: 'Configure Limits',
-      globalSystemOverrides: 'Global System Overrides',
-      globalOverridesDesc: 'These settings enforce global environment overrides directly in the backend cache layer. Changes take effect instantly system-wide.',
-      rlsTitle: 'Row Level Security (RLS) Policies',
-      rlsDesc: 'Toggle DB multi-tenant isolation layers',
-      aiTitle: 'AI & Speech Assessment Engine',
-      aiDesc: 'Turn on/off speech pronunciation features globally',
-      genAiTitle: 'Enable GenAI Support Copilots',
-      genAiDesc: 'Toggles LLM components in Student LMS',
-      maintenanceTitle: 'Global Maintenance Mode',
-      maintenanceDesc: 'Restricts all client app requests to static maintenance view',
-      auditedSupportTitle: 'Audited Support Access Mode',
-      auditedSupportDesc: 'For security reasons, any platform admin entering the workspace of a tenant is logged. The audit record is immutable and stored permanently.',
-      selectTargetOrg: 'Select Target Organization',
-      chooseTenant: '-- Choose Tenant --',
-      targetUserId: 'Target User ID (UUID)',
-      reasonImpersonation: 'Reason for Impersonation',
-      reasonPlaceholder: 'Explain why client data access is needed (ticket reference, database error, billing audit)...',
-      authorizeImpersonation: 'Authorize & Log Support Session',
-      dbStatus: 'Database Status',
-      activeConnections: 'Active Connections',
-      avgQueryExecution: 'Avg Query Execution',
-      lastMigrationRun: 'Last Migration Run',
-      cacheJobQueues: 'Cache & Job Queues',
-      redisCacheHits: 'Redis Cache Hits',
-      bullmqPendingJobs: 'BullMQ Pending Jobs',
-      activeWorkers: 'Active Workers',
-      avgQueueProcessTime: 'Avg Queue Process Time',
-      securityAuditing: 'Security & Auditing',
-      auditLogs24h: 'Audit Logs Recorded (24h)',
-      activeImpersonations: 'Active Impersonations',
-      failedAdminLogins: 'Failed Admin Logins',
-      versionText: 'Console Version',
-      free: 'Free',
-      growth: 'Growth',
-      pro: 'Pro',
-      actions: 'Actions'
-    },
-    ru: {
-      consoleTitle: 'Панель супер-администратора',
-      accessRestricted: 'Доступ ограничен внутренним пультом управления',
-      emailLabel: 'Электронная почта',
-      passwordLabel: 'Пароль',
-      signInBtn: 'Войти в панель',
-      signingIn: 'Вход...',
-      orgManagement: 'Управление организациями',
-      billingQuotas: 'Тарифы и квоты',
-      featureFlags: 'Глобальные функции',
-      impersonation: 'Поддержка и сессии',
-      systemHealth: 'Здоровье системы',
-      logout: 'Выйти из консоли',
-      serverOnline: 'Сервер Онлайн',
-      activeTenants: 'Активные клиенты',
-      tenantName: 'Название организации',
-      slugIdentifier: 'Алиас (Slug)',
-      billingPlan: 'Тарифный план',
-      status: 'Статус',
-      createdDate: 'Дата создания',
-      securityControl: 'Управление безопасностью',
-      suspendTenant: 'Приостановить',
-      activateTenant: 'Активировать',
-      quotaOverrides: 'Редактировать лимиты',
-      billingPlanTier: 'Уровень тарифа',
-      maxActiveStudents: 'Макс. активных студентов',
-      storageQuotaGb: 'Квота хранилища (ГБ)',
-      applyChanges: 'Применить изменения',
-      cancel: 'Отмена',
-      resourceLicensingControls: 'Управление ресурсами и лицензированием',
-      studentLimit: 'Лимит студентов',
-      storageLimit: 'Лимит хранилища',
-      configureLimits: 'Настроить лимиты',
-      globalSystemOverrides: 'Глобальные настройки системы',
-      globalOverridesDesc: 'Эти настройки применяют глобальные переменные окружения напрямую в кэш-слое бэкенда. Изменения вступают в силу мгновенно.',
-      rlsTitle: 'Политики безопасности строк (RLS)',
-      rlsDesc: 'Включение многоарендной изоляции на уровне БД',
-      aiTitle: 'Движок оценки речи и ИИ',
-      aiDesc: 'Включение глобального оценивания произношения',
-      genAiTitle: 'Включение GenAI ассистентов',
-      genAiDesc: 'Переключает компоненты ИИ в личном кабинете студента',
-      maintenanceTitle: 'Глобальный режим обслуживания',
-      maintenanceDesc: 'Перенаправляет все запросы на страницу обслуживания',
-      auditedSupportTitle: 'Поддержка с аудитом доступа',
-      auditedSupportDesc: 'В целях безопасности вход администраторов в пространства клиентов логируется. Запись аудита неизменяема и хранится вечно.',
-      selectTargetOrg: 'Выберите организацию',
-      chooseTenant: '-- Выберите клиента --',
-      targetUserId: 'ID пользователя (UUID)',
-      reasonImpersonation: 'Причина входа',
-      reasonPlaceholder: 'Опишите причину доступа к данным клиента (номер тикета, ошибка в БД, аудит биллинга)...',
-      authorizeImpersonation: 'Авторизовать и логировать сессию',
-      dbStatus: 'Статус базы данных',
-      activeConnections: 'Активные соединения',
-      avgQueryExecution: 'Ср. время выполнения запроса',
-      lastMigrationRun: 'Последняя миграция',
-      cacheJobQueues: 'Кэш и очереди задач',
-      redisCacheHits: 'Хит-рейт кэша Redis',
-      bullmqPendingJobs: 'Ожидающие задачи BullMQ',
-      activeWorkers: 'Активные воркеры',
-      avgQueueProcessTime: 'Ср. время обработки очереди',
-      securityAuditing: 'Аудит и безопасность',
-      auditLogs24h: 'Логи аудита (24ч)',
-      activeImpersonations: 'Активные сессии имитации',
-      failedAdminLogins: 'Ошибки входа админа',
-      versionText: 'Версия консоли',
-      free: 'Бесплатный',
-      growth: 'Рост',
-      pro: 'Про',
-      actions: 'Действия'
-    },
-    uz: {
-      consoleTitle: 'Super Admin Boshqaruv Paneli',
-      accessRestricted: 'Kirish cheklangan ichki tizim konsoli',
-      emailLabel: 'Elektron pochta manzili',
-      passwordLabel: 'Parol',
-      signInBtn: 'Konsolga kirish',
-      signingIn: 'Kirilmoqda...',
-      orgManagement: 'Tashkilotlarni boshqarish',
-      billingQuotas: 'Tariflar va limitlar',
-      featureFlags: 'Global funksiyalar',
-      impersonation: 'Impersonatsiya',
-      systemHealth: 'Tizim salomatligi',
-      logout: 'Konsoldan chiqish',
-      serverOnline: 'Server Onlayn',
-      activeTenants: 'Faol mijozlar',
-      tenantName: 'Tashkilot nomi',
-      slugIdentifier: 'Slug',
-      billingPlan: 'Tarif rejasi',
-      status: 'Holat',
-      createdDate: 'Yaratilgan sana',
-      securityControl: 'Xavfsizlik nazorati',
-      suspendTenant: 'To\'xtatish',
-      activateTenant: 'Faollashtirish',
-      quotaOverrides: 'Limitlarni tahrirlash',
-      billingPlanTier: 'Tarif darajasi',
-      maxActiveStudents: 'Maks. faol talabalar',
-      storageQuotaGb: 'Xotira limiti (GB)',
-      applyChanges: 'O\'zgarishlarni saqlash',
-      cancel: 'Bekor qilish',
-      resourceLicensingControls: 'Resurs va litsenziya nazorati',
-      studentLimit: 'Talabalar limiti',
-      storageLimit: 'Xotira limiti',
-      configureLimits: 'Limitlarni sozlash',
-      globalSystemOverrides: 'Global tizim sozlamalari',
-      globalOverridesDesc: 'Ushbu sozlamalar global muhit qiymatlarini to\'g\'ridan-to\'g\'ri kesh qatlamida o\'zgartiradi. O\'zgarishlar darhol kuchga kiradi.',
-      rlsTitle: 'Qator darajasidagi xavfsizlik (RLS)',
-      rlsDesc: 'Bazada ko\'p ijarali ajratish siyosatini yoqish',
-      aiTitle: 'Sun\'iy intellekt va nutqni baholash',
-      aiDesc: 'Nutq talaffuzini baholash xizmatini yoqish',
-      genAiTitle: 'GenAI yordamchilarini yoqish',
-      genAiDesc: 'LMS talabalar interfeysida sun\'iy intellektni yoqadi',
-      maintenanceTitle: 'Global texnik xizmat rejimi',
-      maintenanceDesc: 'Barcha mijoz so\'rovlarini texnik xizmat ko\'rsatish sahifasiga yo\'naltiradi',
-      auditedSupportTitle: 'Audit qilinadigan qo\'llab-quvvatlash rejimi',
-      auditedSupportDesc: 'Xavfsizlik nuqtai nazaridan, administratorning mijoz maydoniga kirishi qayd etiladi. Ushbu yozuv doimiydir.',
-      selectTargetOrg: 'Tashkilotni tanlang',
-      chooseTenant: '-- Mijozni tanlang --',
-      targetUserId: 'Foydalanuvchi ID (UUID)',
-      reasonImpersonation: 'Kirish sababi',
-      reasonPlaceholder: 'Mijoz ma\'lumotlariga kirish sababini tushuntiring (murojaat raqami, xatolik, billing auditi)...',
-      authorizeImpersonation: 'Avtorizatsiya qilish va seansni yozish',
-      dbStatus: 'Ma\'lumotlar bazasi holati',
-      activeConnections: 'Faol aloqalar',
-      avgQueryExecution: 'O\'rtacha so\'rov vaqti',
-      lastMigrationRun: 'So\'nggi ishga tushgan migratsiya',
-      cacheJobQueues: 'Kesh va navbatlar',
-      redisCacheHits: 'Redis kesh ko\'rsatkichi',
-      bullmqPendingJobs: 'Kutilayotgan BullMQ vazifalari',
-      activeWorkers: 'Faol ishchilar (Workers)',
-      avgQueueProcessTime: 'O\'rtacha navbat vaqti',
-      securityAuditing: 'Xavfsizlik va audit',
-      auditLogs24h: 'Audit yozuvlari (24s)',
-      activeImpersonations: 'Faol impersonatsiyalar',
-      failedAdminLogins: 'Muvaffaqiyatsiz kirishlar',
-      versionText: 'Konsol versiyasi',
-      free: 'Bepul',
-      growth: 'O\'sish',
-      pro: 'Pro',
-      actions: 'Amallar'
-    }
-  };
-
-  const t = (key: string) => {
-    return localTranslations[lang][key] || localTranslations.en[key] || key;
-  };
+  // ─── Effects ────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (window.electronAPI) {
-      window.electronAPI.getAppVersion().then(v => setAppVersion(v));
-    }
+    window.electronAPI?.getAppVersion().then(setAppVersion).catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (token) {
-      fetchOrganizations();
-    }
+    if (token) fetchOrganizations();
   }, [token]);
+
+  // ─── Data fetching ──────────────────────────────────────────────────────────
+
+  const fetchOrganizations = async () => {
+    setOrgsLoading(true);
+    try {
+      const data = await apiGet<Organization[]>('/platform/v1/organizations', token!);
+      setOrgs(data);
+    } catch {
+      console.warn('[CampusOS Admin] API offline — using mock data');
+      setOrgs(OFFLINE_ORGS);
+    } finally {
+      setOrgsLoading(false);
+    }
+  };
+
+  // ─── Actions ────────────────────────────────────────────────────────────────
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
-    setIsLoading(true);
-
+    setLoginLoading(true);
     try {
-      const response = await fetch('http://localhost:3000/api/v1/auth/login', {
+      const res = await fetch(`${BASE}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Invalid username or password');
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || 'Invalid credentials');
       }
+      const { accessToken } = await res.json();
+      if (!accessToken) throw new Error('No access token returned');
 
-      const data = await response.json();
-      const accessToken = data.accessToken;
-
-      if (!accessToken) {
-        throw new Error('Authentication token not returned by server');
-      }
-
+      // Role enforcement
       if (window.electronAPI) {
-        const verifyRes = await window.electronAPI.verifyTokenRole(accessToken);
-        if (!verifyRes.valid) {
-          throw new Error(verifyRes.error || 'Access restricted to Platform Super Admins only.');
-        }
+        const check = await window.electronAPI.verifyTokenRole(accessToken);
+        if (!check.valid) throw new Error(check.error || 'Access restricted to Platform Super Admins only.');
       } else {
         const payload = JSON.parse(atob(accessToken.split('.')[1]));
-        if (!payload.roles || !payload.roles.includes('platform_super_admin')) {
+        if (!payload.roles?.includes('platform_super_admin')) {
           throw new Error('Access restricted to Platform Super Admins only.');
         }
       }
 
       localStorage.setItem('admin_token', accessToken);
       setToken(accessToken);
-      if (window.electronAPI) {
-        window.electronAPI.showNotification('Access Granted', 'Welcome to the Super Admin Console.');
-      }
+      window.electronAPI?.showNotification('Access Granted', 'Welcome to the Super Admin Console.');
     } catch (err: any) {
-      setLoginError(err.message || 'Login failed. Connection refused.');
+      setLoginError(err.message || 'Login failed');
     } finally {
-      setIsLoading(false);
+      setLoginLoading(false);
     }
   };
 
@@ -369,309 +411,99 @@ export default function App() {
     setOrgs([]);
   };
 
-  const fetchOrganizations = async () => {
-    setLoadingOrgs(true);
-    try {
-      const response = await fetch('http://localhost:3000/platform/v1/organizations', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch tenants');
-      const data = await response.json();
-      setOrgs(data);
-    } catch (err) {
-      console.warn('API Offline. Loading offline system representation.');
-      setOrgs([
-        {
-          id: 'b6f2fcd0-1845-4bb6-a9bb-0bfa7c90b637',
-          name: 'Standard Institute of Sciences',
-          slug: 'sis-science',
-          status: 'active',
-          billingPlan: 'growth',
-          settings: { studentQuota: 500, storageQuotaGb: 50 },
-          createdAt: '2026-02-14T10:00:00Z',
-        },
-        {
-          id: 'f946358c-dcb9-4a94-b152-cb4db142a781',
-          name: 'Global Languages Academy',
-          slug: 'gla-edu',
-          status: 'active',
-          billingPlan: 'pro',
-          settings: { studentQuota: 2000, storageQuotaGb: 200 },
-          createdAt: '2026-04-01T14:32:00Z',
-        },
-        {
-          id: 'c8375ba7-47b8-4d33-bc42-df232ba71ab3',
-          name: 'Beta Test College',
-          slug: 'beta-coll',
-          status: 'suspended',
-          billingPlan: 'free',
-          settings: { studentQuota: 100, storageQuotaGb: 10 },
-          createdAt: '2026-06-20T08:15:00Z',
-        }
-      ]);
-    } finally {
-      setLoadingOrgs(false);
-    }
-  };
-
-  const toggleTenantStatus = async (org: Organization) => {
+  const handleToggleStatus = async (org: Organization) => {
     const nextStatus = org.status === 'active' ? 'suspended' : 'active';
     try {
-      const response = await fetch(`http://localhost:3000/platform/v1/organizations/${org.id}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: nextStatus }),
-      });
-
-      if (!response.ok) throw new Error('Status change rejected by server');
-
-      showStatusAlert('success', `Organization status set to ${nextStatus}`);
+      await apiPatch(`/platform/v1/organizations/${org.id}/status`, token!, { status: nextStatus });
+      showToast('success', `Organization status set to ${nextStatus}`);
       fetchOrganizations();
-    } catch (err) {
-      setOrgs((prev: any) => prev.map((o: any) => o.id === org.id ? { ...o, status: nextStatus } : o));
-      showStatusAlert('success', `[Offline Demo] Saved: status toggled to ${nextStatus}`);
+    } catch {
+      setOrgs((prev) => prev.map((o) => o.id === org.id ? { ...o, status: nextStatus as any } : o));
+      showToast('success', `[Offline] Status toggled to ${nextStatus}`);
     }
   };
 
-  const saveQuota = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingOrg) return;
-
-    const payload = {
-      billingPlan: newPlan,
-      settings: {
-        studentQuota: quotaStudents,
-        storageQuotaGb: quotaStorage
-      }
-    };
-
+  const handleSaveQuota = async (orgId: string, plan: string, students: number, storageGb: number) => {
+    const payload = { billingPlan: plan, settings: { studentQuota: students, storageQuotaGb: storageGb } };
     try {
-      const response = await fetch(`http://localhost:3000/platform/v1/organizations/${editingOrg.id}/quota`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) throw new Error('Quota update failed');
-      
-      showStatusAlert('success', 'Billing plan and quotas updated successfully');
-      setEditingOrg(null);
+      await apiPatch(`/platform/v1/organizations/${orgId}/quota`, token!, payload);
+      showToast('success', 'Billing plan and quotas updated');
       fetchOrganizations();
-    } catch (err) {
-      setOrgs((prev: any) => prev.map((o: any) => o.id === editingOrg.id ? { ...o, billingPlan: newPlan, settings: payload.settings } : o));
-      showStatusAlert('success', '[Offline Demo] Saved: plan quota overrides applied');
-      setEditingOrg(null);
+    } catch {
+      setOrgs((prev) => prev.map((o) => o.id === orgId ? { ...o, ...payload } : o));
+      showToast('success', '[Offline] Quota overrides applied');
     }
   };
 
-  const triggerImpersonation = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!impersonateOrgId || !impersonateUserId || !impersonateReason) {
-      showStatusAlert('error', 'Please fill in all impersonation audit details');
-      return;
-    }
-
+  const handleImpersonation = async (orgId: string, userId: string, reason: string) => {
     try {
-      const response = await fetch(`http://localhost:3000/platform/v1/organizations/${impersonateOrgId}/impersonate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ targetUserId: impersonateUserId, reason: impersonateReason }),
-      });
-
-      if (!response.ok) throw new Error('Impersonation token fetch rejected');
-
-      showStatusAlert('success', `Impersonation access key generated for user ${impersonateUserId}. Session audit logged.`);
-      setImpersonateReason('');
-    } catch (err) {
-      showStatusAlert('success', `[Offline Demo] Impersonation log written to audit_logs table (actor: Super Admin, reason: "${impersonateReason}")`);
-      setImpersonateReason('');
+      await apiPost(`/platform/v1/organizations/${orgId}/impersonate`, token!, { targetUserId: userId, reason });
+      showToast('success', `Impersonation token generated. Session audit logged.`);
+    } catch {
+      showToast('success', `[Offline] Audit log written — actor: Super Admin, reason: "${reason}"`);
     }
   };
 
-  const showStatusAlert = (type: 'success' | 'error', text: string) => {
-    setActionMessage({ type, text });
-    setTimeout(() => setActionMessage(null), 5000);
+  const handleFlagToggle = (key: keyof GlobalFlags) => {
+    setFlags((prev) => ({ ...prev, [key]: !prev[key] }));
+    showToast('success', `Global flag '${key}' updated`);
   };
 
-  const handleFlagToggle = (key: keyof typeof globalFlags) => {
-    setGlobalFlags((prev: any) => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-    showStatusAlert('success', `Global flag '${String(key)}' updated`);
-  };
-
-  const LanguageSwitcherLocal = () => (
-    <div style={{ display: 'flex', gap: '4px', background: 'rgba(0, 0, 0, 0.05)', padding: '4px', borderRadius: '6px', border: '1px solid rgba(0, 0, 0, 0.08)' }}>
-      {(['en', 'ru', 'uz'] as const).map(l => (
-        <button
-          key={l}
-          type="button"
-          onClick={() => changeLang(l)}
-          style={{
-            border: 'none',
-            background: lang === l ? '#6366f1' : 'transparent',
-            color: lang === l ? 'white' : '#475569',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            fontSize: '11px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-        >
-          {l.toUpperCase()}
-        </button>
-      ))}
-    </div>
-  );
+  // ─── Login Screen ────────────────────────────────────────────────────────────
 
   if (!token) {
     return (
-      <div className="login-container">
-        <style>{`
-          .login-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            background: radial-gradient(circle at top right, #eef2ff, #f8fafc);
-            position: relative;
-          }
-          .login-card {
-            background: #ffffff;
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            border-radius: 16px;
-            padding: 40px;
-            width: 440px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.06);
-          }
-          .login-header {
-            text-align: center;
-            margin-bottom: 30px;
-          }
-          .login-header h2 {
-            margin: 0;
-            color: #0f172a;
-            font-size: 24px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-          }
-          .login-header p {
-            margin: 8px 0 0 0;
-            color: #475569;
-            font-size: 14px;
-          }
-          .form-group {
-            margin-bottom: 20px;
-          }
-          .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-size: 12px;
-            font-weight: 600;
-            color: #475569;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-          }
-          .form-control {
-            width: 100%;
-            padding: 12px 16px;
-            background: #ffffff;
-            border: 1px solid rgba(0, 0, 0, 0.12);
-            border-radius: 8px;
-            color: #0f172a;
-            font-size: 14px;
-            transition: all 0.3s ease;
-          }
-          .form-control:focus {
-            outline: none;
-            border-color: #6366f1;
-            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
-          }
-          .btn-primary {
-            width: 100%;
-            padding: 12px;
-            background: #6366f1;
-            border: none;
-            border-radius: 8px;
-            color: white;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            transition: background 0.2s;
-          }
-          .btn-primary:hover {
-            background: #4f46e5;
-          }
-          .error-alert {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.25);
-            padding: 12px;
-            border-radius: 8px;
-            color: #ef4444;
-            font-size: 13px;
-            margin-bottom: 20px;
-            display: flex;
-            gap: 8px;
-            align-items: center;
-          }
-        `}</style>
-        <div style={{ position: 'absolute', top: '24px', right: '24px' }}>
-          <LanguageSwitcherLocal />
+      <div className="login-page">
+        <div className="login-lang-switcher">
+          <LangSwitcher lang={lang} onChange={changeLang} />
         </div>
+
         <div className="login-card">
-          <div className="login-header">
-            <Building2 size={36} color="#6366f1" style={{ marginBottom: '12px' }} />
-            <h2>{t('consoleTitle')}</h2>
-            <p>{t('accessRestricted')}</p>
+          <div className="login-brand">
+            <div className="login-brand-icon">
+              <Building2 size={28} color="#fff" />
+            </div>
+            <h1 className="login-title">{t('consoleTitle')}</h1>
+            <p className="login-subtitle">{t('accessRestricted')}</p>
           </div>
+
           {loginError && (
-            <div className="error-alert">
-              <ShieldAlert size={18} />
+            <div className="alert alert-error" role="alert">
+              <ShieldAlert size={16} aria-hidden />
               <span>{loginError}</span>
             </div>
           )}
-          <form onSubmit={handleLogin}>
+
+          <form onSubmit={handleLogin} noValidate>
             <div className="form-group">
-              <label>{t('emailLabel')}</label>
+              <label className="form-label" htmlFor="login-email">{t('emailLabel')}</label>
               <input
+                id="login-email"
                 type="email"
                 required
+                autoComplete="email"
                 className="form-control"
                 placeholder="superadmin@campusos.dev"
                 value={email}
-                onChange={(e: any) => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div className="form-group">
-              <label>{t('passwordLabel')}</label>
+              <label className="form-label" htmlFor="login-password">{t('passwordLabel')}</label>
               <input
+                id="login-password"
                 type="password"
                 required
+                autoComplete="current-password"
                 className="form-control"
                 placeholder="••••••••"
                 value={password}
-                onChange={(e: any) => setPassword(e.target.value)}
+                onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            <button type="submit" className="btn-primary" disabled={isLoading}>
-              {isLoading ? <Loader2 className="spinner" size={16} /> : null}
-              {t('signInBtn')}
+            <button type="submit" className="btn btn-primary w-full mt-5" disabled={loginLoading}>
+              {loginLoading && <Loader2 size={16} className="spinner" aria-hidden />}
+              {loginLoading ? t('signingIn') : t('signInBtn')}
             </button>
           </form>
         </div>
@@ -679,733 +511,82 @@ export default function App() {
     );
   }
 
-  return (
-    <div className="app-container">
-      <style>{`
-        .app-container {
-          display: flex;
-          height: 100vh;
-          background: #f8fafc;
-          overflow: hidden;
-        }
-        .sidebar {
-          width: 260px;
-          background: #ffffff;
-          border-right: 1px solid rgba(0, 0, 0, 0.08);
-          display: flex;
-          flex-direction: column;
-          padding: 20px 0;
-        }
-        .sidebar-brand {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 0 20px 24px 20px;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-        }
-        .sidebar-brand h3 {
-          margin: 0;
-          font-size: 16px;
-          font-weight: 700;
-          color: #0f172a;
-        }
-        .sidebar-brand span {
-          display: block;
-          font-size: 11px;
-          color: #6366f1;
-          font-weight: 600;
-          text-transform: uppercase;
-        }
-        .sidebar-menu {
-          list-style: none;
-          padding: 20px 10px;
-          margin: 0;
-          flex: 1;
-        }
-        .menu-item {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 12px 16px;
-          color: #475569;
-          text-decoration: none;
-          font-size: 14px;
-          font-weight: 500;
-          border-radius: 8px;
-          cursor: pointer;
-          margin-bottom: 4px;
-          transition: all 0.2s;
-        }
-        .menu-item:hover, .menu-item.active {
-          color: #4f46e5;
-          background: rgba(99, 102, 241, 0.08);
-        }
-        .menu-item.active {
-          border: 1px solid rgba(99, 102, 241, 0.2);
-          color: #4f46e5;
-        }
-        .sidebar-footer {
-          padding: 0 16px;
-          border-top: 1px solid rgba(0, 0, 0, 0.08);
-          padding-top: 16px;
-        }
-        .logout-btn {
-          width: 100%;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 10px 16px;
-          color: #dc2626;
-          background: transparent;
-          border: 1px solid rgba(220, 38, 38, 0.25);
-          border-radius: 8px;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .logout-btn:hover {
-          background: rgba(220, 38, 38, 0.06);
-        }
-        .app-main {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-        }
-        .app-header {
-          height: 64px;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 0 32px;
-          background: #ffffff;
-        }
-        .app-header h1 {
-          margin: 0;
-          font-size: 18px;
-          font-weight: 600;
-          color: #0f172a;
-        }
-        .app-body {
-          flex: 1;
-          padding: 32px;
-          overflow-y: auto;
-        }
-        .glass-card {
-          background: #ffffff;
-          border: 1px solid rgba(0, 0, 0, 0.08);
-          border-radius: 12px;
-          padding: 24px;
-          margin-bottom: 24px;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.02);
-        }
-        .card-title {
-          font-size: 15px;
-          font-weight: 600;
-          color: #0f172a;
-          margin-top: 0;
-          margin-bottom: 20px;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .tenant-table {
-          width: 100%;
-          border-collapse: collapse;
-          text-align: left;
-        }
-        .tenant-table th {
-          padding: 12px;
-          font-size: 11px;
-          font-weight: 600;
-          color: #64748b;
-          text-transform: uppercase;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-        }
-        .tenant-table td {
-          padding: 16px 12px;
-          font-size: 14px;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-          color: #334155;
-        }
-        .badge {
-          display: inline-flex;
-          padding: 2px 8px;
-          border-radius: 9999px;
-          font-size: 11px;
-          font-weight: 600;
-          text-transform: uppercase;
-        }
-        .badge.active { background: rgba(34, 197, 94, 0.15); color: #16a34a; }
-        .badge.suspended { background: rgba(239, 68, 68, 0.15); color: #dc2626; }
-        .badge.free { background: rgba(148, 163, 184, 0.15); color: #475569; }
-        .badge.pro { background: rgba(168, 85, 247, 0.15); color: #7c3aed; }
-        .badge.growth { background: rgba(59, 130, 246, 0.15); color: #2563eb; }
-        
-        .btn {
-          padding: 8px 16px;
-          border-radius: 6px;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-          border: none;
-          transition: all 0.2s;
-        }
-        .btn-sm {
-          padding: 4px 10px;
-          font-size: 11px;
-        }
-        .btn-outline-danger {
-          background: transparent;
-          border: 1px solid rgba(220, 38, 38, 0.4);
-          color: #dc2626;
-        }
-        .btn-outline-danger:hover {
-          background: rgba(220, 38, 38, 0.06);
-        }
-        .btn-outline-primary {
-          background: transparent;
-          border: 1px solid rgba(99, 102, 241, 0.5);
-          color: #4f46e5;
-        }
-        .btn-outline-primary:hover {
-          background: rgba(99, 102, 241, 0.08);
-        }
-        .grid-2 {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 24px;
-        }
-        .alert-toast {
-          position: fixed;
-          bottom: 24px;
-          right: 24px;
-          background: #0f172a;
-          border-left: 4px solid #6366f1;
-          border-radius: 6px;
-          padding: 16px;
-          color: white;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          z-index: 1000;
-          animation: slideIn 0.3s forwards;
-        }
-        .alert-toast.success { border-left-color: #22c55e; }
-        .alert-toast.error { border-left-color: #ef4444; }
-        @keyframes slideIn {
-          from { transform: translateX(100%); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-        .spinner {
-          animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        .flag-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 12px;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-        }
-        .switch {
-          position: relative;
-          display: inline-block;
-          width: 44px;
-          height: 24px;
-        }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider {
-          position: absolute;
-          cursor: pointer;
-          top: 0; left: 0; right: 0; bottom: 0;
-          background-color: #cbd5e1;
-          transition: .3s;
-          border-radius: 24px;
-        }
-        .slider:before {
-          position: absolute;
-          content: "";
-          height: 18px;
-          width: 18px;
-          left: 3px;
-          bottom: 3px;
-          background-color: white;
-          transition: .3s;
-          border-radius: 50%;
-        }
-        input:checked + .slider { background-color: #6366f1; }
-        input:checked + .slider:before { transform: translateX(20px); }
-        .metric-card {
-          padding: 16px;
-          border-radius: 8px;
-          background: rgba(0, 0, 0, 0.02);
-          border: 1px solid rgba(0, 0, 0, 0.04);
-          display: flex;
-          flex-direction: column;
-        }
-        .metric-value {
-          font-size: 24px;
-          font-weight: 700;
-          color: #0f172a;
-          margin-top: 4px;
-        }
-        .metric-label {
-          font-size: 11px;
-          color: #64748b;
-          text-transform: uppercase;
-        }
-      `}</style>
+  // ─── App Shell ───────────────────────────────────────────────────────────────
 
-      {actionMessage && (
-        <div className={`alert-toast ${actionMessage.type}`}>
-          {actionMessage.type === 'success' ? <CheckCircle color="#22c55e" size={20} /> : <AlertTriangle color="#ef4444" size={20} />}
-          <span>{actionMessage.text}</span>
-        </div>
-      )}
+  const TAB_TITLES: Record<Tab, string> = {
+    orgs: t('orgManagement'),
+    billing: t('billingQuotas'),
+    flags: t('featureFlags'),
+    support: t('impersonation'),
+    health: t('systemHealth'),
+  };
+
+  return (
+    <div className="admin-shell">
+      <Toast message={toast} />
 
       {/* Sidebar */}
-      <div className="sidebar">
+      <aside className="admin-sidebar" role="navigation" aria-label="Main navigation">
         <div className="sidebar-brand">
-          <Building2 size={28} color="#6366f1" />
-          <div>
+          <div className="sidebar-brand-icon">
+            <Building2 size={20} color="#fff" />
+          </div>
+          <div className="sidebar-brand-text">
             <h3>CampusOS</h3>
             <span>{t('consoleTitle')}</span>
           </div>
         </div>
 
-        <ul className="sidebar-menu">
-          <li 
-            className={`menu-item ${activeTab === 'orgs' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('orgs'); setEditingOrg(null); }}
-          >
-            <Building2 size={18} />
-            <span>{t('orgManagement')}</span>
-          </li>
-          <li 
-            className={`menu-item ${activeTab === 'billing' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('billing'); setEditingOrg(null); }}
-          >
-            <CreditCard size={18} />
-            <span>{t('billingQuotas')}</span>
-          </li>
-          <li 
-            className={`menu-item ${activeTab === 'flags' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('flags'); setEditingOrg(null); }}
-          >
-            <Flag size={18} />
-            <span>{t('featureFlags')}</span>
-          </li>
-          <li 
-            className={`menu-item ${activeTab === 'support' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('support'); setEditingOrg(null); }}
-          >
-            <UserCheck size={18} />
-            <span>{t('impersonation')}</span>
-          </li>
-          <li 
-            className={`menu-item ${activeTab === 'health' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('health'); setEditingOrg(null); }}
-          >
-            <Activity size={18} />
-            <span>{t('systemHealth')}</span>
-          </li>
-        </ul>
+        <nav className="sidebar-nav">
+          {NAV_ITEMS.map(({ id, labelKey, Icon }) => (
+            <button
+              key={id}
+              className={`nav-item${activeTab === id ? ' active' : ''}`}
+              onClick={() => setActiveTab(id)}
+              aria-current={activeTab === id ? 'page' : undefined}
+            >
+              <Icon size={18} aria-hidden />
+              {t(labelKey)}
+            </button>
+          ))}
+        </nav>
 
         <div className="sidebar-footer">
-          <div style={{ color: '#475569', fontSize: '11px', textAlign: 'center', marginBottom: '12px' }}>
-            {t('versionText')} {appVersion}
-          </div>
-          <button className="logout-btn" onClick={handleLogout}>
-            <LogOut size={16} />
+          <p className="sidebar-version">{t('versionText')} {appVersion}</p>
+          <button className="btn btn-danger-ghost w-full" onClick={handleLogout}>
+            <LogOut size={16} aria-hidden />
             {t('logout')}
           </button>
         </div>
-      </div>
+      </aside>
 
-      {/* Main Content Area */}
-      <div className="app-main">
-        <div className="app-header">
-          <h1>
-            {activeTab === 'orgs' && t('orgManagement')}
-            {activeTab === 'billing' && t('billingQuotas')}
-            {activeTab === 'flags' && t('featureFlags')}
-            {activeTab === 'support' && t('impersonation')}
-            {activeTab === 'health' && t('systemHealth')}
-          </h1>
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-            <LanguageSwitcherLocal />
-            <span className="badge active" style={{ fontSize: '10px' }}>{t('serverOnline')}</span>
+      {/* Main */}
+      <div className="admin-main">
+        <header className="admin-topbar">
+          <h1 className="topbar-title">{TAB_TITLES[activeTab]}</h1>
+          <div className="topbar-right">
+            <LangSwitcher lang={lang} onChange={changeLang} />
+            <span className="badge badge-online">{t('serverOnline')}</span>
           </div>
-        </div>
+        </header>
 
-        <div className="app-body">
-          {/* TAB 1: ORGANIZATION LIFECYCLE */}
+        <main className="admin-body" role="main">
           {activeTab === 'orgs' && (
-            <div className="glass-card">
-              <div className="card-title">
-                <Building2 size={20} color="#6366f1" />
-                <span>{t('activeTenants')}</span>
-              </div>
-
-              {loadingOrgs ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
-                  <Loader2 className="spinner" size={24} color="#6366f1" />
-                </div>
-              ) : (
-                <table className="tenant-table">
-                  <thead>
-                    <tr>
-                      <th>{t('tenantName')}</th>
-                      <th>{t('slugIdentifier')}</th>
-                      <th>{t('billingPlan')}</th>
-                      <th>{t('status')}</th>
-                      <th>{t('createdDate')}</th>
-                      <th>{t('securityControl')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orgs.map((org: any) => (
-                      <tr key={org.id}>
-                        <td style={{ fontWeight: '600', color: '#0f172a' }}>{org.name}</td>
-                        <td><code>{org.slug}</code></td>
-                        <td>
-                          <span className={`badge ${org.billingPlan}`}>{t(org.billingPlan)}</span>
-                        </td>
-                        <td>
-                          <span className={`badge ${org.status}`}>{t(org.status)}</span>
-                        </td>
-                        <td>{new Date(org.createdAt).toLocaleDateString()}</td>
-                        <td>
-                          <button 
-                            className={`btn btn-sm ${org.status === 'active' ? 'btn-outline-danger' : 'btn-outline-primary'}`}
-                            onClick={() => toggleTenantStatus(org)}
-                          >
-                            {org.status === 'active' ? t('suspendTenant') : t('activateTenant')}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+            <OrgsPage orgs={orgs} loading={orgsLoading} onToggleStatus={handleToggleStatus} t={t} />
           )}
-
-          {/* TAB 2: BILLING & QUOTAS */}
           {activeTab === 'billing' && (
-            <div>
-              {editingOrg ? (
-                <div className="glass-card">
-                  <div className="card-title">
-                    <Sliders size={20} color="#6366f1" />
-                    <span>{t('quotaOverrides')} — {editingOrg.name}</span>
-                  </div>
-                  <form onSubmit={saveQuota}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-                      <div className="form-group">
-                        <label>{t('billingPlanTier')}</label>
-                        <select 
-                          className="form-control" 
-                          value={newPlan} 
-                          onChange={(e: any) => setNewPlan(e.target.value)}
-                          style={{ background: '#ffffff', color: '#0f172a' }}
-                        >
-                          <option value="free">{t('free')}</option>
-                          <option value="growth">{t('growth')}</option>
-                          <option value="pro">{t('pro')}</option>
-                          <option value="enterprise">Bespoke Chain (Enterprise)</option>
-                        </select>
-                      </div>
-                      <div className="form-group">
-                        <label>{t('maxActiveStudents')}</label>
-                        <input 
-                          type="number" 
-                          className="form-control" 
-                          value={quotaStudents}
-                          onChange={(e: any) => setQuotaStudents(Number(e.target.value))}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>{t('storageQuotaGb')}</label>
-                        <input 
-                          type="number" 
-                          className="form-control" 
-                          value={quotaStorage}
-                          onChange={(e: any) => setQuotaStorage(Number(e.target.value))}
-                        />
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <button type="submit" className="btn btn-outline-primary">{t('applyChanges')}</button>
-                      <button type="button" className="btn btn-outline-danger" onClick={() => setEditingOrg(null)}>{t('cancel')}</button>
-                    </div>
-                  </form>
-                </div>
-              ) : (
-                <div className="glass-card">
-                  <div className="card-title">
-                    <CreditCard size={20} color="#6366f1" />
-                    <span>{t('resourceLicensingControls')}</span>
-                  </div>
-                  <table className="tenant-table">
-                    <thead>
-                      <tr>
-                        <th>{t('tenantName')}</th>
-                        <th>{t('billingPlan')}</th>
-                        <th>{t('studentLimit')}</th>
-                        <th>{t('storageLimit')}</th>
-                        <th>{t('actions')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {orgs.map((org: any) => (
-                        <tr key={org.id}>
-                          <td style={{ color: '#0f172a', fontWeight: '500' }}>{org.name}</td>
-                          <td><span className={`badge ${org.billingPlan}`}>{t(org.billingPlan)}</span></td>
-                          <td>{org.settings.studentQuota || 100} students</td>
-                          <td>{org.settings.storageQuotaGb || 10} GB</td>
-                          <td>
-                            <button 
-                              className="btn btn-sm btn-outline-primary"
-                              onClick={() => {
-                                setEditingOrg(org);
-                                setNewPlan(org.billingPlan);
-                                setQuotaStudents(org.settings.studentQuota || 100);
-                                setQuotaStorage(org.settings.storageQuotaGb || 10);
-                              }}
-                            >
-                              {t('configureLimits')}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+            <BillingPage orgs={orgs} onSaveQuota={handleSaveQuota} t={t} />
           )}
-
-          {/* TAB 3: FEATURE FLAGS */}
           {activeTab === 'flags' && (
-            <div className="glass-card">
-              <div className="card-title">
-                <Flag size={20} color="#6366f1" />
-                <span>{t('globalSystemOverrides')}</span>
-              </div>
-              <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '24px' }}>
-                {t('globalOverridesDesc')}
-              </p>
-
-              <div className="flag-row">
-                <div>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#0f172a' }}>{t('rlsTitle')}</h4>
-                  <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>{t('rlsDesc')}</p>
-                </div>
-                <label className="switch">
-                  <input 
-                    type="checkbox" 
-                    checked={globalFlags.enableRLSPolicies}
-                    onChange={() => handleFlagToggle('enableRLSPolicies')}
-                  />
-                  <span className="slider"></span>
-                </label>
-              </div>
-
-              <div className="flag-row">
-                <div>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#0f172a' }}>{t('aiTitle')}</h4>
-                  <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>{t('aiDesc')}</p>
-                </div>
-                <label className="switch">
-                  <input 
-                    type="checkbox" 
-                    checked={globalFlags.enableSpeechScoring}
-                    onChange={() => handleFlagToggle('enableSpeechScoring')}
-                  />
-                  <span className="slider"></span>
-                </label>
-              </div>
-
-              <div className="flag-row">
-                <div>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#0f172a' }}>{t('genAiTitle')}</h4>
-                  <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>{t('genAiDesc')}</p>
-                </div>
-                <label className="switch">
-                  <input 
-                    type="checkbox" 
-                    checked={globalFlags.enableAIModule}
-                    onChange={() => handleFlagToggle('enableAIModule')}
-                  />
-                  <span className="slider"></span>
-                </label>
-              </div>
-
-              <div className="flag-row">
-                <div>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#0f172a' }}>{t('maintenanceTitle')}</h4>
-                  <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>{t('maintenanceDesc')}</p>
-                </div>
-                <label className="switch">
-                  <input 
-                    type="checkbox" 
-                    checked={globalFlags.maintenanceMode}
-                    onChange={() => handleFlagToggle('maintenanceMode')}
-                  />
-                  <span className="slider"></span>
-                </label>
-              </div>
-            </div>
+            <FlagsPage flags={flags} onToggle={handleFlagToggle} t={t} />
           )}
-
-          {/* TAB 4: SUPPORT IMPERSONATION */}
           {activeTab === 'support' && (
-            <div className="glass-card">
-              <div className="card-title">
-                <UserCheck size={20} color="#6366f1" />
-                <span>{t('auditedSupportTitle')}</span>
-              </div>
-              <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '24px' }}>
-                {t('auditedSupportDesc')}
-              </p>
-
-              <form onSubmit={triggerImpersonation} style={{ maxWidth: '600px' }}>
-                <div className="form-group">
-                  <label>{t('selectTargetOrg')}</label>
-                  <select 
-                    className="form-control"
-                    value={impersonateOrgId}
-                    onChange={(e: any) => setImpersonateOrgId(e.target.value)}
-                    style={{ background: '#ffffff', color: '#0f172a' }}
-                    required
-                  >
-                    <option value="">{t('chooseTenant')}</option>
-                    {orgs.map((o: any) => (
-                      <option key={o.id} value={o.id}>{o.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group" style={{ marginTop: '16px' }}>
-                  <label>{t('targetUserId')}</label>
-                  <input 
-                    type="text"
-                    required
-                    className="form-control"
-                    placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000"
-                    value={impersonateUserId}
-                    onChange={(e: any) => setImpersonateUserId(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group" style={{ marginTop: '16px' }}>
-                  <label>{t('reasonImpersonation')}</label>
-                  <textarea 
-                    required
-                    className="form-control"
-                    rows={4}
-                    placeholder={t('reasonPlaceholder')}
-                    value={impersonateReason}
-                    onChange={(e: any) => setImpersonateReason(e.target.value)}
-                    style={{ resize: 'none', background: '#ffffff', color: '#0f172a' }}
-                  />
-                </div>
-
-                <button 
-                  type="submit" 
-                  className="btn btn-outline-primary"
-                  style={{ marginTop: '20px', display: 'flex', gap: '8px', alignItems: 'center' }}
-                >
-                  <ShieldAlert size={16} />
-                  {t('authorizeImpersonation')}
-                </button>
-              </form>
-            </div>
+            <SupportPage orgs={orgs} onSubmit={handleImpersonation} t={t} />
           )}
-
-          {/* TAB 5: HEALTH MONITORING */}
           {activeTab === 'health' && (
-            <div>
-              <div className="grid-2">
-                <div className="glass-card">
-                  <div className="card-title">
-                    <Activity size={20} color="#6366f1" />
-                    <span>{t('dbStatus')}</span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div className="metric-card">
-                      <span className="metric-label">{t('activeConnections')}</span>
-                      <span className="metric-value">12 / 100</span>
-                    </div>
-                    <div className="metric-card">
-                      <span className="metric-label">{t('avgQueryExecution')}</span>
-                      <span className="metric-value">4.2 ms</span>
-                    </div>
-                    <div className="metric-card" style={{ gridColumn: 'span 2' }}>
-                      <span className="metric-label">{t('lastMigrationRun')}</span>
-                      <span className="metric-value" style={{ fontSize: '13px', color: '#16a34a' }}>
-                        14-July-2026 - Migration v1.0.8 successful
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="glass-card">
-                  <div className="card-title">
-                    <Activity size={20} color="#6366f1" />
-                    <span>{t('cacheJobQueues')}</span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div className="metric-card">
-                      <span className="metric-label">{t('redisCacheHits')}</span>
-                      <span className="metric-value">94.8%</span>
-                    </div>
-                    <div className="metric-card">
-                      <span className="metric-label">{t('bullmqPendingJobs')}</span>
-                      <span className="metric-value">0</span>
-                    </div>
-                    <div className="metric-card">
-                      <span className="metric-label">{t('activeWorkers')}</span>
-                      <span className="metric-value">4 / 4</span>
-                    </div>
-                    <div className="metric-card">
-                      <span className="metric-label">{t('avgQueueProcessTime')}</span>
-                      <span className="metric-value">180 ms</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="glass-card">
-                <div className="card-title">
-                  <ShieldAlert size={20} color="#6366f1" />
-                  <span>{t('securityAuditing')}</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-                  <div className="metric-card">
-                    <span className="metric-label">{t('auditLogs24h')}</span>
-                    <span className="metric-value">482</span>
-                  </div>
-                  <div className="metric-card">
-                    <span className="metric-label">{t('activeImpersonations')}</span>
-                    <span className="metric-value" style={{ color: '#dc2626' }}>0</span>
-                  </div>
-                  <div className="metric-card">
-                    <span className="metric-label">{t('failedAdminLogins')}</span>
-                    <span className="metric-value">0</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <HealthPage t={t} />
           )}
-        </div>
+        </main>
       </div>
     </div>
   );

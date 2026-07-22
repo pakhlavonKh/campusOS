@@ -1,4 +1,8 @@
 import { create } from 'zustand';
+import { Platform } from 'react-native';
+
+const getDefaultBackendUrl = () =>
+  Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
 
 interface ThemeState {
   primaryColor: string;
@@ -31,12 +35,12 @@ export const useThemeStore = create<ThemeState>((set) => ({
   setTheme: (primaryColor, secondaryColor, fontFamily = 'System', logoUrl = null, faviconUrl = null) => 
     set({ primaryColor, secondaryColor, fontFamily, logoUrl, faviconUrl }),
 
-  fetchTheme: async (slug: string, backendUrl = 'http://localhost:3000') => {
+  fetchTheme: async (slug: string, backendUrl = getDefaultBackendUrl()) => {
     set({ loading: true, error: null });
     try {
       // In React Native development, 'localhost' refers to the emulator/device itself.
       // In production, the backendUrl is configured globally.
-      const url = `${backendUrl}/api/organizations/${slug}/white-label/public`;
+      const url = `${backendUrl}/api/v1/organizations/${slug}/white-label/public`;
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error('Failed to resolve organization theme.');

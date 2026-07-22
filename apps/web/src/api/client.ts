@@ -3,7 +3,7 @@
  * Handles base URL mapping, authorization headers, and common error parsing.
  */
 
-const BASE_URL = '/api'; // Proxied to backend via Vite in dev
+const BASE_URL = '/api/v1'; // Proxied to backend via Vite in dev
 
 interface FetchOptions extends RequestInit {
   params?: Record<string, string>;

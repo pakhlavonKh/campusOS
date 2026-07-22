@@ -974,15 +974,17 @@ Per-organization frontend customization (SRS 5.26) is implemented as three tiers
 - A small, curated set of alternate layout components (e.g., `DashboardLayoutA`, `DashboardLayoutB`, alternate nav placements) ship in the shared codebase behind a `layout_variant` config key.
 - Feature-flag-style resolution (`FeatureFlagService` pattern, §3.2.3) picks the active variant per organization/branch at render time. New variants require an engineering release (they're pre-built), but *assigning* a variant to an organization is a config change, not a deploy.
 
-**Tier 3 — Custom Build (Enterprise, dedicated engagement):**
-- For UI needs beyond Tiers 1–2, the customer gets a dedicated frontend deployment that imports `packages/ui`, `packages/sdk`, and `packages/shared` as versioned private npm packages, rather than forking the app source.
-- This keeps the custom build receiving core component fixes/updates via normal package version bumps, while allowing arbitrary page composition, custom components, and layout beyond what config-driven Tiers 1–2 support.
-- Explicitly **not** supported: arbitrary client-supplied code (JS/CSS) executed inside the shared multi-tenant app. Injecting tenant-authored code into a shared runtime is an XSS/security risk across tenants; Tier 3 exists specifically so bespoke needs get an isolated deployment instead.
+**Tier 3 — Dedicated Per-Organization Application (opt-in, tooled onboarding step):**
+- Every organization requiring bespoke UI beyond Tiers 1–2 gets its **own folder and deployment** under `apps/orgs/{org-slug}/` in the monorepo — a full React application scaffolded from a reference template, not a fork of `apps/web`.
+- **Scaffolding:** `scripts/create-org-app.ts` (invoked as `pnpm create-org-app --slug orgname --tenant-id <id>`) copies the reference template into `apps/orgs/{org-slug}/`, wires up the organization's tenant ID and API base URL, and seeds it with that organization's existing Tier 1 token config as a starting point — so the dedicated app is functional immediately and customization happens on top of a working baseline, not from a blank slate.
+- **Shared dependency, independent deployment:** every `apps/orgs/{org-slug}/` app imports `packages/ui`, `packages/sdk`, and `packages/shared` as versioned packages (private npm registry) — never copies their source — and is built/deployed on its own pipeline (own domain or subdomain, own CDN target). The backend is never duplicated: every org app, regardless of tier, authenticates against the same shared API (`/api/v1/...`) and the same Postgres database with tenant isolation enforced by RLS as usual (§7). Tier 3 only changes how the frontend is delivered, never the backend/data architecture.
+- **Registry and drift tracking:** a lightweight internal table (`org_apps`: organization_id, repo_path, deployment_url, packages_ui_version, packages_sdk_version, last_deployed_at) lets the platform team see every provisioned org app and how far its shared-package versions have drifted from latest. A scheduled CI job checks this weekly and flags apps that are more than N minor versions or any security-patch version behind, so custom apps don't silently rot on stale, vulnerable dependencies.
+- Explicitly **not** supported: arbitrary tenant-supplied code (JS/CSS) executed inside the *shared* multi-tenant `apps/web` runtime. Injecting tenant-authored code into a shared runtime is a cross-tenant XSS risk; Tier 3 exists specifically so bespoke needs get their own isolated deployment instead of a shared one.
 
 **Data shape (`organizations.white_label_config` JSONB):**
 ```json
 {
-  "tier": "token" ,
+  "tier": "token",
   "tokens": {
     "colorPrimary": "#1A56DB",
     "colorSecondary": "#0F172A",
@@ -992,7 +994,13 @@ Per-organization frontend customization (SRS 5.26) is implemented as three tiers
     "customDomain": "learn.orgname.com"
   },
   "layoutVariant": null,
-  "customBuildRef": null
+  "dedicatedApp": {
+    "repoPath": "apps/orgs/orgname",
+    "deploymentUrl": "https://learn.orgname.com",
+    "packagesUiVersion": null,
+    "packagesSdkVersion": null,
+    "lastDeployedAt": null
+  }
 }
 ```
 
@@ -6319,6 +6327,17 @@ campusos/
 │       ├── package.json
 │       └── electron-builder.yml               # signed internal build config, private distribution channel
 │
+│   orgs/                                      # Tier 3 dedicated per-organization apps (SDD 3.2.3.1) — one folder per client, created via `pnpm create-org-app`
+│   ├── _template/                             # Reference template that create-org-app.ts clones — kept generic, no org-specific content
+│   │   ├── src/                               # Same structure as apps/web (routes, layouts, features) — starting point, not a fixed constraint
+│   │   ├── package.json                       # depends on packages/ui, packages/sdk, packages/shared as published versions
+│   │   └── org.config.json                    # tenant ID, API base URL, seeded Tier 1 token config — filled in by the scaffolding script
+│   ├── acme-language-school/                   # Example: one real client's dedicated app, freely customized post-scaffold
+│   │   ├── src/
+│   │   ├── package.json
+│   │   └── org.config.json
+│   └── ...                                     # additional client folders added as they are onboarded
+│
 ├── packages/                                # Shared packages
 │   ├── shared/                              # Shared TypeScript types and utilities
 │   │   ├── src/
@@ -6415,7 +6434,9 @@ campusos/
 │   ├── setup.sh
 │   ├── seed-database.sh
 │   ├── generate-sdk.sh
-│   └── run-migrations.sh
+│   ├── run-migrations.sh
+│   ├── create-org-app.ts                    # Scaffolds apps/orgs/{slug} from apps/orgs/_template (SDD 3.2.3.1)
+│   └── check-org-app-drift.ts                # CI job: flags org apps behind on packages/ui, packages/sdk, packages/shared versions
 │
 ├── .agents/                                 # AI agent configuration
 │   ├── AGENTS.md
@@ -6786,13 +6807,386 @@ erDiagram
 *End of System Design Document*
 
 **Document Statistics:**
-- Sections: 23 + 2 Appendices
+- Sections: 24 + 2 Appendices
 - Bounded Contexts: 28
 - Domain Events: 80+
-- Database Tables: 60+
-- Background Job Types: 30+
+- Database Tables: 65+
+- Background Job Types: 35+
 - Mermaid Diagrams: 25+
-- API Endpoints: 200+ (implied)
+- API Endpoints: 210+ (implied)
 - Integration Points: 15+
+- Gap IDs covered: 27 (SRS §20 / SDD §24)
 
 **This document is the authoritative engineering reference for CampusOS implementation.**
+
+---
+
+## 24. Implementation Gap Register — Architecture Decisions
+
+This section provides the architectural design decisions, interface contracts, and implementation guidance for each gap formally registered in SRS §20. Sub-section numbers mirror SRS §20 for traceability.
+
+---
+
+### 24.1 Authentication — Missing Endpoints (SRS GAP-AUTH-01, GAP-AUTH-02, GAP-AUTH-03)
+
+#### 24.1.1 MFA Two-Step Login Challenge
+
+MFA is implemented as a **two-step login challenge**. The existing `POST /api/v1/auth/login` response is extended:
+
+```
+Step 1: POST /api/v1/auth/login
+  Request:  { email, password }
+  Response A (no MFA):        { accessToken, refreshToken }
+  Response B (MFA required):  { challengeToken, mfaMethod: 'totp' | 'sms' }
+
+Step 2: POST /api/v1/auth/mfa/verify
+  Request:  { challengeToken, code }
+  Response: { accessToken, refreshToken }
+```
+
+The `challengeToken` is a short-lived JWT (5 min TTL) carrying only `{ sub: userId, scope: 'mfa_challenge' }`. The standard `JwtStrategy` MUST reject tokens where `scope !== 'api_access'`.
+
+**TOTP setup:**
+```
+POST /api/v1/auth/mfa/setup          → { provisioningUri, backupCodes }
+POST /api/v1/auth/mfa/setup/confirm  → { enabled: true }   (validates code first)
+```
+
+**Password reset:**
+```
+POST /api/v1/auth/forgot-password    → 200 always (prevents email enumeration)
+POST /api/v1/auth/reset-password     → { success: true } + invalidates all refresh tokens
+```
+
+**Invitation acceptance:**
+```
+POST /api/v1/auth/invite/accept
+  Request:  { invitationToken, password, firstName, lastName }
+  Response: { accessToken, refreshToken }
+  Side effects: creates AuthCredential, activates Membership, emits InvitationAccepted
+```
+
+**SSO:**
+```
+GET /api/v1/auth/sso/:provider           → redirect to provider
+GET /api/v1/auth/sso/:provider/callback  → exchange code for internal JWT
+```
+
+#### 24.1.2 Platform Super Admin Login Isolation
+
+`POST /platform/v1/auth/login` MUST:
+1. Accept `{ email, password }`.
+2. Reject with HTTP 403 if the user's highest role is not `platform_super_admin`.
+3. Issue JWT with additional claim `{ client: 'admin_desktop' }`.
+4. Unconditionally apply the TOTP challenge (no bypass path).
+
+The standard `/api/v1/auth/login` MUST reject any `platform_super_admin` user with HTTP 403 and message `"Use the Platform Admin Console."`.
+
+#### 24.1.3 MfaRequiredGuard
+
+```typescript
+@Injectable()
+export class MfaRequiredGuard implements CanActivate {
+  canActivate(ctx: ExecutionContext): boolean {
+    const user = ctx.switchToHttp().getRequest().user;
+    const mandatory = ['platform_super_admin', 'org_admin', 'branch_admin'];
+    if (mandatory.some(r => user.roles.includes(r)) && !user.mfaEnabled) {
+      throw new ForbiddenException({ code: 'MFA_REQUIRED' });
+    }
+    return true;
+  }
+}
+```
+
+Register as a global guard at lower priority than `AuthGuard`, higher than `RbacGuard`.
+
+---
+
+### 24.2 Security — RLS & Build Isolation (SRS GAP-SEC-01, GAP-SEC-02)
+
+#### 24.2.1 PostgreSQL RLS Pattern
+
+```sql
+-- TenantMiddleware sets this on every request:
+SET LOCAL app.current_organization_id = '<uuid>';
+
+-- Migration applies this to every multi-tenant table:
+ALTER TABLE courses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE courses FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON courses
+  USING (organization_id = current_setting('app.current_organization_id')::uuid);
+```
+
+A TypeORM `EntitySubscriber` on `BeforeQueryEvent` reads `organizationId` from `AsyncLocalStorage` and issues `SET LOCAL` before each query. `TenantMiddleware` populates the `AsyncLocalStorage` store from the validated JWT.
+
+**Tables requiring RLS** (minimum): `users`, `memberships`, `courses`, `modules`, `lessons`, `content_blocks`, `homework`, `homework_submissions`, `quiz_attempts`, `quiz_responses`, `gradebook_entries`, `grade_history`, `attendance_records`, `schedule_events`, `messages`, `notifications`, `invoices`, `payments`, `groups`, `group_memberships`, `announcements`, `threads`, `posts`.
+
+#### 24.2.2 Build Isolation CI Check
+
+```bash
+# Runs as a job in .github/workflows/ci.yml
+grep -rE "(/admin|/platform/v1|platform_super_admin)" \
+  apps/web/src apps/mobile/src 2>/dev/null \
+  && echo "ERROR: Platform admin surface found in customer build" && exit 1 || exit 0
+```
+
+---
+
+### 24.3 Database Migrations & Seeding (SRS GAP-DB-01, GAP-DB-02)
+
+#### 24.3.1 TypeORM CLI Data Source
+
+`apps/backend/typeorm.config.ts`:
+
+```typescript
+import { DataSource } from 'typeorm';
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+export default new DataSource({
+  type: 'postgres',
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT),
+  username: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME,
+  entities: ['src/**/*.entity.ts'],
+  migrations: ['src/migrations/*.ts'],
+  synchronize: false,
+});
+```
+
+`package.json` scripts:
+```json
+{
+  "migration:generate": "typeorm migration:generate -d typeorm.config.ts src/migrations/",
+  "migration:run":      "typeorm migration:run -d typeorm.config.ts",
+  "migration:revert":   "typeorm migration:revert -d typeorm.config.ts",
+  "seed":               "ts-node src/seeds/index.ts"
+}
+```
+
+#### 24.3.2 Seeder Layout
+
+```
+apps/backend/src/seeds/
+├── index.ts              ← orchestrates order + idempotency guard
+├── roles.seed.ts         ← SystemRole enum + DEFAULT_ROLE_PERMISSIONS → roles/permissions tables
+├── permissions.seed.ts
+├── super-admin.seed.ts   ← platform_super_admin user (from .env.seed)
+└── demo-tenant.seed.ts   ← sample org, 2 branches, demo courses, teacher/student/parent users
+```
+
+All seeds use upsert (`INSERT … ON CONFLICT DO NOTHING`) for idempotency.
+
+---
+
+### 24.4 WebSocket Gateway Architecture (SRS GAP-SVC-07)
+
+#### 24.4.1 RealtimeGateway
+
+`apps/backend/src/shared/gateways/realtime.gateway.ts`:
+
+```typescript
+@WebSocketGateway({ cors: true, namespace: '/realtime' })
+export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  @WebSocketServer() server: Server;
+
+  async handleConnection(socket: Socket) {
+    const payload = await this.jwtService.verifyAsync(socket.handshake.auth.token);
+    socket.join(`org:${payload.organizationId}`);
+    socket.join(`branch:${payload.branchId}`);
+    socket.join(`user:${payload.sub}`);
+  }
+
+  handleDisconnect(socket: Socket) { socket.rooms.forEach(r => socket.leave(r)); }
+
+  emitToOrg(organizationId: string, event: string, data: unknown) {
+    this.server.to(`org:${organizationId}`).emit(event, data);
+  }
+  emitToUser(userId: string, event: string, data: unknown) {
+    this.server.to(`user:${userId}`).emit(event, data);
+  }
+  emitToQuizAttempt(attemptId: string, event: string, data: unknown) {
+    this.server.to(`quiz:${attemptId}`).emit(event, data);
+  }
+}
+```
+
+**Room naming convention:**
+
+| Room | Purpose |
+|------|---------|
+| `org:{organizationId}` | Org-wide: maintenance banners, system announcements |
+| `branch:{branchId}` | Branch announcements |
+| `user:{userId}` | Personal notifications, direct messages |
+| `quiz:{attemptId}` | Live anti-cheat monitoring |
+| `thread:{threadId}` | Real-time discussion updates |
+
+---
+
+### 24.5 Notification Delivery Pipeline (SRS GAP-SVC-06)
+
+**`notification_templates` table:**
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid | PK |
+| `organization_id` | uuid nullable | NULL = platform default |
+| `event_type` | varchar | e.g. `homework.assigned` |
+| `channel` | varchar | `in_app` / `email` / `push` / `sms` |
+| `locale` | varchar(5) | `en` / `ru` / `uz` |
+| `subject_template` | text | Handlebars |
+| `body_template` | text | Handlebars |
+
+**BullMQ queues per channel:**
+```
+notification:in_app  → RealtimeGateway.emitToUser()
+notification:email   → SendGrid / SMTP
+notification:push    → Expo Push API (FCM + APNs)
+notification:sms     → Twilio (optional)
+```
+
+Retry: exponential backoff, max 5 attempts. Terminal failure → `notification_delivery_failures` table + `NotificationDeliveryFailed` event.
+
+---
+
+### 24.6 Assessment Engine State Machine (SRS GAP-SVC-01)
+
+```
+not_started → in_progress  (POST /assessment/quiz/:id/start)
+in_progress → submitted    (POST /assessment/attempt/:id/submit  OR  server-side BullMQ timeout)
+submitted   → graded       (AutoGraderService / ManualGradingService)
+```
+
+**Timeout enforcement:** Enqueue `quiz-timeout:{attemptId}` delayed job (delay = `timeLimit * 1000` ms) on attempt creation. Worker calls `QuizDeliveryService.autoSubmit()`. Cancel job via `Queue.remove(jobId)` if student submits manually first.
+
+---
+
+### 24.7 LMS Completion Propagation (SRS GAP-SVC-03)
+
+`CompletionService.markLessonComplete` runs inside a single database transaction:
+
+```
+1. Upsert CompletionRecord { userId, entityType: 'lesson', entityId: lessonId }
+2. Count completed vs total lessons in parent module
+3. If all lessons done → upsert CompletionRecord for module → emit ModuleCompleted
+   3a. Count completed vs total modules in parent course
+   3b. If all modules done → upsert CompletionRecord for course → emit CourseCompleted
+4. Emit LessonCompleted regardless
+```
+
+---
+
+### 24.8 Shared Package Architecture (SRS GAP-PKG-01, GAP-PKG-02)
+
+#### 24.8.1 `packages/ui`
+
+```
+packages/ui/
+├── package.json      { "name": "@campusos/ui" }
+├── src/
+│   ├── tokens.css    ← single source of truth: all CSS custom properties
+│   ├── index.ts      ← barrel export
+│   └── components/   ← Button, Input, Badge, Card, Table, Modal, Toast,
+│                        Avatar, Spinner, Toggle, LangSwitcher, Sidebar, Topbar
+```
+
+Components consume `tokens.css` custom properties only — no hardcoded values.
+
+#### 24.8.2 `packages/sdk`
+
+```
+packages/sdk/
+├── package.json      { "name": "@campusos/sdk" }
+└── src/
+    ├── client.ts     ← base fetch with auth header + 401 auto-refresh
+    └── resources/    ← auth, courses, users, organizations, gradebook,
+                         assessment, attendance, messaging, notifications, platform
+```
+
+The client intercepts HTTP 401, calls `auth.refresh()` once, retries the original request, throws if refresh fails.
+
+---
+
+### 24.9 CI/CD Pipeline (SRS GAP-OPS-01)
+
+| Workflow file | Trigger | Key jobs |
+|---------------|---------|---------|
+| `ci.yml` | PR → `main`/`develop` | lint, typecheck, unit tests (≥80% cov), build-guard |
+| `integration.yml` | Push → `main` | DB migrations + seed + integration tests |
+| `build.yml` | Tag `v*.*.*` | Docker build + registry push |
+| `deploy-staging.yml` | Push → `main` | Auto-deploy staging |
+| `deploy-production.yml` | Manual + approval gate | Production deploy + smoke test |
+| `drift-check.yml` | Cron: weekly | Tier 3 org app package version drift report |
+
+---
+
+### 24.10 Observability Architecture (SRS GAP-OPS-03, GAP-OPS-04)
+
+#### 24.10.1 OpenTelemetry Bootstrap
+
+```typescript
+// apps/backend/src/tracing.ts  — imported as FIRST statement in main.ts
+import { NodeSDK } from '@opentelemetry/sdk-node';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
+import { Resource } from '@opentelemetry/resources';
+import { SemanticResourceAttributes as SRA } from '@opentelemetry/semantic-conventions';
+
+new NodeSDK({
+  resource: new Resource({ [SRA.SERVICE_NAME]: 'campusos-api' }),
+  traceExporter: new OTLPTraceExporter({ url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT }),
+}).start();
+```
+
+```typescript
+// main.ts (first two lines)
+import './tracing';
+import { NestFactory } from '@nestjs/core';
+```
+
+Auto-instrumented: HTTP requests, TypeORM, Redis, BullMQ. Metrics on `/metrics` (Prometheus).
+
+#### 24.10.2 Structured JSON Logging
+
+Use `@nestjs/pino`. Required fields per log line:
+`timestamp`, `level`, `service`, `traceId` (active OTel span), `organizationId` (from request context), `userId` (from JWT), `message`.
+
+---
+
+### 24.11 Test Architecture (SRS GAP-TEST-01 through GAP-TEST-05)
+
+#### 24.11.1 Directory Layout
+
+```
+apps/backend/test/
+├── unit/
+│   ├── auth/          ← GAP-TEST-02 units
+│   ├── assessment/    ← GAP-TEST-03: state machine, auto-grading
+│   └── gradebook/     ← GAP-TEST-04: weighted calc, scale conversions
+├── integration/
+│   ├── isolation/     ← GAP-TEST-01: cross-tenant leak tests
+│   ├── auth-flows/    ← GAP-TEST-02: full flow against real DB + Redis
+│   ├── quiz-engine/   ← GAP-TEST-03: timeout enforcement
+│   └── websocket/     ← GAP-TEST-05: room isolation
+└── helpers/
+    ├── test-tenant.ts ← TestTenant factory
+    └── test-app.ts    ← NestJS test bootstrap with real DB
+```
+
+#### 24.11.2 Tenant Isolation Test Pattern
+
+```typescript
+it('returns 403 or 404 when Org A user requests Org B resource', async () => {
+  await request(app.getHttpServer())
+    .get(`/api/v1/courses/${orgB.courseId}`)
+    .set('Authorization', `Bearer ${orgA.userToken}`)
+    .expect(res => expect([403, 404]).toContain(res.status));
+});
+```
+
+Repeat for every resource type carrying `organization_id`.
+
+---
+
+*End of System Design Document*

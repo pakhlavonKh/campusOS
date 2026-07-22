@@ -53,6 +53,7 @@
    - 5.26 Frontend Theming and Customization
    - 5.27 Student and Parent Web Portal
    - 5.28 Platform Super Admin Desktop Application
+   - 5.29 Per-Organization App Provisioning and Maintenance
 6. Non-Functional Requirements
 7. Business Rules
 8. Domain Model
@@ -906,17 +907,17 @@ Support future content and template distribution between organizations.
 
 ### 5.26 Frontend Theming and Customization
 
-Support per-organization visual customization of the client applications without requiring a separate codebase, build, or deployment per tenant, across three tiers:
+Support per-organization visual customization of the client applications, across three tiers, all connected to the single shared backend/API (no per-organization backend):
 
-- **Tier 1 — Token Theming [all tiers].** Organization Admin can configure logo, favicon/app icon, primary/secondary/accent colors, font family (from a supported set), and custom subdomain (`orgname.platform.com`). Applied at runtime via a design-token/theme configuration loaded per organization; no redeploy required.
-- **Tier 2 — Layout Variants [Pro/Chain and above].** Organization Admin can select from a curated set of pre-built layout and dashboard-arrangement variants (e.g., alternate home/dashboard layouts, alternate navigation styles) per branch or organization, still served from the shared codebase via configuration, not custom code.
-- **Tier 3 — Custom Build [Enterprise, dedicated add-on].** For organizations requiring bespoke UI beyond Tiers 1–2, support a dedicated frontend build that consumes the platform's shared UI component library and API SDK as versioned packages, so the customer-specific build still receives core updates and bug fixes without a full fork. This tier carries its own deployment, hosting, and maintenance cost and is priced/scoped as a separate services engagement, not a standard subscription feature.
+- **Tier 1 — Token Theming [default, all tiers, no redeploy].** Organization Admin can configure logo, favicon/app icon, primary/secondary/accent colors, font family (from a supported set), and custom subdomain (`orgname.platform.com`). Applied at runtime via a design-token/theme configuration loaded per organization from the shared `apps/web` application; no separate codebase or deployment.
+- **Tier 2 — Layout Variants [Pro/Chain and above, no redeploy].** Organization Admin can select from a curated set of pre-built layout and dashboard-arrangement variants, still served from the shared `apps/web` codebase via configuration.
+- **Tier 3 — Dedicated Per-Organization Application [opt-in, any organization that needs it].** For organizations requiring bespoke UI beyond Tiers 1–2, provision a **separate, dedicated frontend application and deployment for that organization**, scaffolded from the platform's reference template and customized freely (custom pages, custom components, custom UX flows) while still consuming the platform's shared UI component library and API SDK as versioned packages — so the dedicated app keeps receiving core fixes and API-contract updates via package version bumps rather than manual re-implementation. Each Tier 3 organization app is deployed and hosted independently (its own build pipeline, its own domain/CDN target) but authenticates against the **same shared backend and API** as every other tenant — Tier 3 changes only the frontend delivery model, never the backend/data architecture. This must be a repeatable, tooled onboarding step (see 5.29), not a one-off bespoke rebuild each time.
 
-Custom domain, logo, and color configuration must apply consistently across web, student/parent web portal, and mobile app (app icon and splash screen) surfaces for a given organization.
+Custom domain, logo, and color configuration must apply consistently across web, student/parent web portal, and mobile app (app icon and splash screen) surfaces for a given organization, regardless of tier.
 
 ### 5.27 Student and Parent Web Portal
 
-Provide a dedicated web application for Student and Parent roles, functionally equivalent to the mobile apps for core workflows: dashboard/overview, course and lesson access, homework submission, grades and gradebook view, attendance view, schedule and exam calendar, messaging and announcements, notifications, and payments where enabled. Voice/pronunciation practice (5.22) must work via browser microphone access where the underlying speech provider supports web audio input. Offline support is not required for the web portal (offline behavior remains a mobile-specific requirement per Section 12); the web portal assumes an active connection.
+Provide a dedicated web application for Student and Parent roles, functionally equivalent to the mobile apps for core workflows: dashboard/overview, course and lesson access, homework submission, grades and gradebook view, attendance view, schedule and exam calendar, messaging and announcements, notifications, and payments where enabled. Voice/pronunciation practice (5.22) must work via browser microphone access where the underlying speech provider supports web audio input. Offline support is not required for the web portal (offline behavior remains a mobile-specific requirement per Section 12); the web portal assumes an active connection. Tier 3 organizations (5.26) may deploy a dedicated build of this portal as well, under the same shared-package model.
 
 ### 5.28 Platform Super Admin Desktop Application
 
@@ -937,6 +938,15 @@ Access and distribution constraints:
 - Login restricted to users holding the Platform Super Admin role at the backend; valid credentials for any other role must be rejected at this app's login, even if otherwise valid, as defense in depth.
 - Mandatory MFA (not optional) for this application, independent of the general "MFA for privileged roles" baseline in 5.1.
 - Session timeout and re-authentication requirements should be stricter than the customer-facing apps, given the scope of access.
+
+### 5.29 Per-Organization App Provisioning and Maintenance
+
+Support a repeatable internal workflow for provisioning a Tier 3 dedicated frontend application (5.26) for a new or existing organization:
+
+- A scaffolding tool/script generates a new organization application from the reference template, pre-wired with the organization's tenant ID, API credentials, and starting theme configuration, so a new client app starts functional and only requires customization on top, not a rebuild from zero.
+- Each provisioned organization application is tracked in an internal registry (organization, app version/package versions in use, deployment URL, last update date) so the platform team can see at a glance which organization apps exist and how current they are.
+- Define and enforce a maximum allowable drift between an organization app's shared-package versions (`packages/ui`, `packages/sdk`, `packages/shared`) and the latest published versions, especially for security patches; organization apps exceeding the allowed drift must be flagged for update.
+- Removing or offboarding an organization's dedicated app must not affect any other organization's app or the shared backend.
 
 ---
 
@@ -1272,3 +1282,227 @@ Additional test requirements:
 - Webhook Event Catalog (all webhook events with payload specifications).
 - Accessibility Compliance Checklist (WCAG 2.1 AA requirements mapped to platform features).
 - Supported Domain Reference (all supported educational domains with domain-specific considerations).
+
+---
+
+## 20. Implementation Gap Register
+
+This section formally records requirements identified during implementation review that were under-specified, missing, or need explicit enforcement language added to an earlier section. Each entry is assigned a **Gap ID** and a **Priority** (Critical / High / Medium). Entries here are normative: they carry the same weight as the section they amend.
+
+---
+
+### 20.1 Authentication & Identity (amends §5.1)
+
+**GAP-AUTH-01 — MFA Endpoints (Critical)**
+The authentication API MUST expose the following endpoints in addition to `login`, `register`, `refresh`, and `logout`:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/auth/mfa/setup` | POST | Initiate TOTP or SMS MFA enrollment; returns provisioning URI and backup codes. |
+| `/auth/mfa/verify` | POST | Validate a TOTP code or SMS OTP during the login challenge step. |
+| `/auth/mfa/disable` | POST | Disable MFA with re-authentication (current password required). |
+| `/auth/forgot-password` | POST | Issue a time-limited password reset token delivered via email. |
+| `/auth/reset-password` | POST | Accept reset token and new password; invalidates all active sessions. |
+| `/auth/invite/accept` | POST | Accept a workspace invitation token, set password, and complete registration. |
+| `/auth/sso/:provider` | GET | Initiate OAuth 2.0 / SAML redirect to the configured identity provider. |
+| `/auth/sso/:provider/callback` | GET/POST | Handle provider callback; exchange code for internal JWT. |
+
+**GAP-AUTH-02 — Mandatory MFA for Privileged Roles (Critical)**
+The system MUST enforce mandatory TOTP MFA (no SMS-only option) for the `platform_super_admin` role and MUST enforce at least one MFA method for `org_admin` and `branch_admin` roles when operating on production tenants. MFA enforcement MUST be checked server-side on every access-token issuance; a client-side bypass MUST NOT be trusted as sole enforcement.
+
+**GAP-AUTH-03 — Platform Super Admin Login Isolation (Critical)**
+The `apps/admin-desktop` application MUST be the only client allowed to exchange credentials for a `platform_super_admin`-scoped JWT. The backend MUST validate an additional `client_id` claim or a dedicated `/platform/v1/auth/login` endpoint that rejects tokens for any role other than `platform_super_admin`. Standard tenant-facing `/api/v1/auth/login` MUST NOT issue `platform_super_admin` tokens regardless of role in the database.
+
+---
+
+### 20.2 Security — Tenant Isolation (amends §3.3, §6)
+
+**GAP-SEC-01 — PostgreSQL Row-Level Security Policies (Critical)**
+In addition to application-layer `organization_id` filtering, every multi-tenant table (any table that carries an `organization_id` column) MUST have a corresponding PostgreSQL RLS policy defined in a versioned database migration. The policies MUST be enabled via `ALTER TABLE … ENABLE ROW LEVEL SECURITY` and MUST be applied before any production data is written. A TypeORM migration file named `YYYYMMDD_rls_policies.ts` MUST be present in `apps/backend/src/migrations/` and MUST be executed as part of the standard deployment pipeline.
+
+**GAP-SEC-02 — Super-Admin Routes Must Not Ship in Customer Builds (Critical)**
+No route, component, guard, or service belonging to the Platform Super Admin surface (`/admin`, `/admin/**`, `/platform/v1/**`) MAY exist in the `apps/web`, `apps/mobile`, or `apps/desktop` build outputs. This MUST be enforced by a CI lint step that fails the build if any of those path patterns are referenced from within a customer-facing app entry point.
+
+---
+
+### 20.3 Database & Migrations (amends §7, §14)
+
+**GAP-DB-01 — Versioned TypeORM Migrations (Critical)**
+The project MUST use TypeORM's migration runner (not `synchronize: true`) in staging and production environments. A `typeorm.config.ts` CLI-compatible data source configuration MUST exist in `apps/backend/`. All schema changes MUST be delivered as timestamped migration files in `apps/backend/src/migrations/`. The `synchronize: true` flag MAY only be enabled when `NODE_ENV === 'development'`.
+
+**GAP-DB-02 — Database Seeder (High)**
+A seed script (`npm run seed` or `pnpm seed`) MUST be available that creates:
+- One `platform_super_admin` user with TOTP MFA pre-configured.
+- One sample organization with two branches, demo courses, and a teacher + student + parent account set.
+- The full system role/permission bootstrap (all `SystemRole` values from `packages/shared/src/constants/roles.ts` seeded into the `roles` and `permissions` tables with their default permission mappings).
+
+---
+
+### 20.4 Backend Services — Required Implementation Completeness (amends §5)
+
+The following service responsibilities are currently defined in the SDD (§3.2.x) but have no confirmed implementation. Each constitutes an incomplete requirement.
+
+**GAP-SVC-01 — Assessment Engine State Machine (Critical)**
+`QuizDeliveryService` MUST implement a server-side state machine for quiz attempts with states: `not_started → in_progress → submitted → graded`. Time enforcement MUST be server-side: the server MUST record `startTime` on attempt creation and MUST auto-submit (`QuizAttemptAutoSubmitted` event) when `startTime + timeLimit` is exceeded, regardless of client state.
+
+**GAP-SVC-02 — Gradebook Calculation Engine (High)**
+`GradeCalculationService` MUST implement weighted category averaging, running-total calculation, and projected-final-grade calculation per the formula: `finalGrade = Σ (categoryWeight × categoryAverage)`. Grade scale conversion MUST support all `GradeScaleType` values from `packages/shared/src/constants/content-types.ts`.
+
+**GAP-SVC-03 — LMS Completion Propagation (High)**
+`CompletionService` MUST implement bottom-up completion propagation: when all lessons in a module are marked complete, the module MUST be automatically marked complete; when all modules in a course are complete, the course MUST be marked complete and a `CourseCompleted` event MUST be emitted to trigger gamification and certificate flows.
+
+**GAP-SVC-04 — Gamification Event Wiring (High)**
+The `GamificationModule` MUST register event listeners for the following events published by other modules: `LessonCompleted`, `HomeworkSubmitted`, `QuizAttemptSubmitted`, `AttendanceRecorded` (status=present), `CourseCompleted`, `QAAnswerAccepted`. Each listener MUST update XP, evaluate badge award conditions, and update streak counters.
+
+**GAP-SVC-05 — Voice Module Provider Adapter (High)**
+`VoiceModule` MUST implement a provider-abstraction interface (`IVoiceProvider`) with at minimum one concrete adapter (Azure Cognitive Services Speech or Deepgram). Audio recordings MUST be uploaded to the storage module before scoring is dispatched to the provider. Scoring results MUST be stored as `PronunciationResult` entities.
+
+**GAP-SVC-06 — Notification Delivery Pipeline (High)**
+`NotificationsModule` MUST implement multi-channel delivery: in-app (WebSocket push), email (SMTP/SendGrid), push notification (FCM for Android, APNs for iOS via Expo), and optionally SMS (Twilio). Each notification MUST be rendered from a template stored in the `notification_templates` table. Delivery failures MUST be retried via BullMQ with exponential backoff (max 5 attempts).
+
+**GAP-SVC-07 — WebSocket Gateway (High)**
+A NestJS `WebSocketGateway` MUST be created as a shared gateway used by: real-time messaging (§5.14), discussion thread live updates (§5.11), live quiz anti-cheat monitoring (§5.8.5), and in-app notification delivery (§5.15). The gateway MUST authenticate connections using the same JWT strategy used by HTTP endpoints and MUST scope socket rooms by `organization_id` and `branch_id` to prevent cross-tenant message leakage.
+
+**GAP-SVC-08 — Webhook Delivery Queue (Medium)**
+`WebhooksModule` MUST implement a BullMQ-backed delivery queue. Each webhook event MUST be delivered with an HMAC-SHA256 signature header (`X-CampusOS-Signature`). Failed deliveries MUST be retried with exponential backoff and a maximum of 7 attempts. Delivery outcomes MUST be stored in a `webhook_delivery_log` table.
+
+**GAP-SVC-09 — Search Index Synchronization (Medium)**
+`SearchModule` MUST synchronize content from PostgreSQL to OpenSearch. Synchronization MUST be event-driven: domain events (e.g., `CourseCreated`, `CoursePublished`, `LessonCreated`, `UserCreated`) MUST trigger index upserts via BullMQ workers. A full re-index CLI command MUST be available for disaster recovery.
+
+**GAP-SVC-10 — Media Transcoding Workers (Medium)**
+`MediaModule` MUST implement BullMQ workers that invoke FFmpeg for video transcoding to HLS format (minimum: 360p, 720p, 1080p renditions). Transcoded assets MUST be uploaded to the configured object storage (S3/MinIO). The original upload MUST be preserved. `MediaModule` MUST expose a `transcodingStatus` endpoint polled by the client until a `MediaReady` event is emitted.
+
+---
+
+### 20.5 RBAC — Permission Seeding & ABAC Policies (amends §5.24)
+
+**GAP-RBAC-01 — System Role Seed (High)**
+All roles defined in `packages/shared/src/constants/roles.ts` (`SystemRole` enum) MUST be seeded into the `roles` table on first startup or via the database seeder. The `DEFAULT_ROLE_PERMISSIONS` map MUST be used to seed the `permissions` and `role_permissions` tables. Seeding MUST be idempotent (safe to run multiple times).
+
+**GAP-RBAC-02 — ABAC Policy Enforcement (High)**
+The `ABACService` MUST evaluate the following attribute-based policies before any service-layer data access is permitted:
+1. Teachers MUST only access students who are members of at least one class the teacher is assigned to.
+2. Branch Admins MUST only access data where `resource.branchId === user.branchId`.
+3. Parents MUST only access grade, attendance, and message data for students they are linked to via a `ParentLink` record.
+
+---
+
+### 20.6 Frontend — Missing Pages & Applications (amends §5)
+
+**GAP-FE-01 — Student/Parent Web Portal (Critical)**
+A dedicated web application `apps/web-portal` MUST be created for the Student and Parent roles. It MUST be functionally separate from the staff/admin `apps/web` application, though it MAY share components from `packages/ui`. Minimum pages:
+
+| Page | Role | SRS Ref |
+|------|------|---------|
+| Dashboard | Student, Parent | §5.27 |
+| My Courses / Lesson Viewer | Student | §5.7 |
+| Homework Submission | Student | §5.9 |
+| Grades View | Student, Parent | §5.19, §5.27 |
+| Attendance View | Student, Parent | §5.12, §5.27 |
+| Schedule | Student | §5.13 |
+| Messaging | Student, Parent | §5.14 |
+| Payments | Parent | §5.16 |
+| Voice Practice | Student | §5.22 |
+
+**GAP-FE-02 — Missing Staff/Admin Web Pages (High)**
+The following pages MUST be implemented in `apps/web` for staff and admin roles:
+
+| Page | Role(s) | SRS Ref |
+|------|---------|---------|
+| Assessment — quiz/exam taking UI | Student (via portal) | §5.8 |
+| Schedule & Calendar | Teacher, Admin | §5.13 |
+| Notifications Center | All roles | §5.15 |
+| Payments & Invoices | Parent, Admin | §5.16 |
+| Groups & Cohorts | Admin, Teacher | §5.10 |
+| Student Gamification Dashboard | Student | §5.21 |
+| Voice Practice Interface | Student | §5.22 |
+| Reporting & Analytics | Admin, Branch Admin | §5.20 |
+| Branch Management | Org Admin | §5.3 |
+| CRM / Lead Pipeline | Admin | §5.17 |
+| User Profile & Settings | All roles | §5.4–5.6 |
+
+**GAP-FE-03 — Admin Desktop Missing Capabilities (High)**
+The Platform Super Admin desktop application (`apps/admin-desktop`) MUST implement the following capabilities not yet present:
+
+| Capability | SRS Ref |
+|-----------|---------|
+| Organization creation (trial provisioning) | §5.28 |
+| Trial-to-paid conversion flow | §5.28 |
+| Consolidated billing dashboard: MRR, churn rate, failed payments, per-branch revenue | §5.28 |
+| Per-organization usage monitoring: storage used, video minutes consumed, AI/speech credits used | §5.28 |
+| Global maintenance banner delivery (not just a flag — a WebSocket push to all connected clients) | §5.28 |
+| Mandatory TOTP MFA challenge in the login flow (not optional) | §5.28, GAP-AUTH-02 |
+
+---
+
+### 20.7 Shared Packages (amends §5.26, §5.29)
+
+**GAP-PKG-01 — `packages/ui` Component Library (High)**
+A shared UI component library MUST be created at `packages/ui/`. It MUST export all primitive components (Button, Input, Select, Badge, Card, Table, Modal, Toast, Avatar, Spinner, Toggle, LanguageSwitcher, Sidebar, Topbar). All components MUST use CSS custom properties from a shared design-token file (`packages/ui/src/tokens.css`) and MUST NOT hardcode color or spacing values. This library MUST be consumed by `apps/web`, `apps/web-portal`, `apps/admin-desktop`, and all Tier 3 `apps/orgs/{slug}` applications.
+
+**GAP-PKG-02 — `packages/sdk` API Client (Medium)**
+A typed API client SDK MUST be created at `packages/sdk/`. It MUST expose typed functions for every endpoint in the `api/v1` and `platform/v1` namespaces (generated from OpenAPI spec or hand-authored). `apps/web`, `apps/web-portal`, `apps/admin-desktop`, and Tier 3 org apps MUST use this SDK for all backend calls; raw `fetch()` calls to backend endpoints MUST NOT appear in application code.
+
+---
+
+### 20.8 DevOps — Gaps (amends §14)
+
+**GAP-OPS-01 — CI/CD Pipeline Files (High)**
+`.github/workflows/` MUST contain the following workflow files:
+
+| File | Trigger | Purpose |
+|------|---------|---------|
+| `ci.yml` | PR to `main` / `develop` | Lint, type-check, unit tests, coverage threshold (≥80%) |
+| `integration.yml` | Merge to `main` | Integration tests against a real PostgreSQL + Redis Docker stack |
+| `build.yml` | Tag push `v*.*.*` | Docker image build + push to container registry |
+| `deploy-staging.yml` | Merge to `main` | Auto-deploy to staging environment |
+| `deploy-production.yml` | Manual trigger with approval | Production deployment with smoke test |
+| `drift-check.yml` | Cron: weekly | Check Tier 3 org app package versions against latest `packages/ui` and `packages/sdk` |
+
+**GAP-OPS-02 — Local Docker Compose Full Stack (Medium)**
+`docker-compose.yml` at the repo root MUST define services for: `postgres`, `redis`, `opensearch`, `minio` (S3-compatible), `mailhog` (SMTP), `backend`, `web`, `web-portal`. A `docker-compose.override.yml` MAY provide dev-time volume mounts. A `make up` or `pnpm docker:up` command MUST start the full stack with a single command.
+
+**GAP-OPS-03 — Structured Logging (Medium)**
+The backend MUST use structured JSON logging (Winston or Pino) instead of `console.log`. Every log line MUST include: `timestamp`, `level`, `service`, `traceId`, `organizationId` (when in a tenant request context), `userId` (when authenticated), and `message`. The `traceId` MUST correlate with the OpenTelemetry trace ID for the same request.
+
+**GAP-OPS-04 — OpenTelemetry Instrumentation (Medium)**
+`apps/backend/src/main.ts` MUST initialize an OpenTelemetry SDK (`@opentelemetry/sdk-node`) before the NestJS bootstrap. Traces MUST be exported to an OTLP endpoint (Jaeger/Tempo in development, AWS X-Ray or Grafana Tempo in production). Metrics MUST be exposed on a `/metrics` endpoint in Prometheus format. The following must be auto-instrumented: HTTP requests, PostgreSQL queries (TypeORM), Redis operations, BullMQ job execution.
+
+---
+
+### 20.9 Testing — Gaps (amends §15)
+
+**GAP-TEST-01 — Tenant Isolation Test Suite (Critical)**
+A dedicated integration test suite MUST verify that no API endpoint leaks data across tenant boundaries. The suite MUST:
+1. Create two separate organizations (Org A, Org B) with identical data structures.
+2. Authenticate as a user from Org A.
+3. Attempt to access every resource type belonging to Org B via direct UUID references.
+4. Assert that every such request returns HTTP 403 or 404.
+
+**GAP-TEST-02 — Auth Flow Coverage (Critical)**
+Unit and integration tests MUST cover: registration, login, refresh, logout, MFA setup, MFA verify (correct code), MFA verify (incorrect code — lockout after N attempts), password reset (valid token), password reset (expired token), invitation acceptance, SSO redirect, and SSO callback.
+
+**GAP-TEST-03 — Assessment Engine Tests (High)**
+Tests MUST cover: attempt state transitions, server-side time enforcement (auto-submit on time expiry), auto-grading for each `QuestionType`, partial credit, anti-cheat violation logging, and manual grading workflow state machine.
+
+**GAP-TEST-04 — Gradebook Calculation Tests (High)**
+Tests MUST cover: weighted category average with 100% total weight, weighted category average where weights do not sum to 100% (partial weight mode), grade scale conversion for each `GradeScaleType`, and projected final grade with missing scores.
+
+**GAP-TEST-05 — WebSocket Isolation Tests (High)**
+Tests MUST verify that WebSocket rooms are scoped by `organization_id`: a socket authenticated for Org A MUST NOT receive events emitted to an Org B room, even when the room name is guessable.
+
+---
+
+### 20.10 Mobile App — Required Features (amends §12)
+
+**GAP-MOB-01 — Offline Content Caching (High)**
+The mobile app MUST cache lesson content (text, PDFs, images) for offline viewing using a local SQLite database (via `expo-sqlite`) or a persistent cache library (e.g., MMKV). Students MUST be able to read previously downloaded lessons without a network connection.
+
+**GAP-MOB-02 — Push Notifications (High)**
+The mobile app MUST register for and receive push notifications via Expo Push Notification service (which delegates to FCM for Android and APNs for iOS). Notification categories: new message, grade posted, homework assigned, attendance recorded, quiz available.
+
+**GAP-MOB-03 — Voice Recording UI (High)**
+The mobile app MUST expose a voice recording interface using `expo-av` that captures audio, displays a recording waveform, and uploads the recording to the backend `VoiceModule` for scoring. Microphone permission MUST be requested following platform-specific guidelines.
+
+**GAP-MOB-04 — Deep Links (Medium)**
+The mobile app MUST handle universal links / app links for the following URL patterns: lesson viewer, homework submission, quiz attempt, grade view, and messaging thread. Deep link handling MUST authenticate the user and navigate to the target screen after the auth flow completes if the user is not already logged in.

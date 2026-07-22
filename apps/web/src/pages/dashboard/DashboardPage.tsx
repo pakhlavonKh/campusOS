@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
   Users,
   BookOpen,
@@ -9,69 +10,87 @@ import {
   Calendar,
   Clock,
 } from 'lucide-react';
-
-const stats = [
-  {
-    title: 'Total Students',
-    value: '2,847',
-    change: '+12.5%',
-    trend: 'positive' as const,
-    icon: Users,
-    iconColor: 'purple',
-  },
-  {
-    title: 'Active Courses',
-    value: '164',
-    change: '+3.2%',
-    trend: 'positive' as const,
-    icon: BookOpen,
-    iconColor: 'green',
-  },
-  {
-    title: 'Today\'s Attendance',
-    value: '94.2%',
-    change: '+1.8%',
-    trend: 'positive' as const,
-    icon: ClipboardCheck,
-    iconColor: 'amber',
-  },
-  {
-    title: 'Avg. Grade',
-    value: 'B+',
-    change: '-0.3%',
-    trend: 'negative' as const,
-    icon: TrendingUp,
-    iconColor: 'red',
-  },
-];
-
-const recentActivities = [
-  { user: 'Sarah Johnson', action: 'submitted homework', target: 'Physics Lab Report', time: '5 min ago', avatar: 'SJ' },
-  { user: 'Michael Chen', action: 'enrolled in', target: 'Advanced Mathematics', time: '12 min ago', avatar: 'MC' },
-  { user: 'Emma Wilson', action: 'graded', target: '15 quiz attempts', time: '25 min ago', avatar: 'EW' },
-  { user: 'James Park', action: 'created course', target: 'Introduction to Biology', time: '1 hr ago', avatar: 'JP' },
-  { user: 'Lisa Anderson', action: 'recorded attendance for', target: 'English Literature B', time: '2 hr ago', avatar: 'LA' },
-];
-
-const upcomingSchedule = [
-  { title: 'Physics 101 — Lecture', time: '09:00 — 10:30', room: 'Room 204', status: 'In Progress' },
-  { title: 'Math Workshop', time: '11:00 — 12:00', room: 'Lab 3', status: 'Upcoming' },
-  { title: 'Staff Meeting', time: '14:00 — 15:00', room: 'Conference A', status: 'Upcoming' },
-  { title: 'Chemistry Lab', time: '15:30 — 17:00', room: 'Lab 1', status: 'Upcoming' },
-];
-
 import { useTranslation } from '../../providers/LanguageProvider';
+import { useAuthStore } from '../../store/auth.store';
+import { apiClient } from '../../api/client';
 
 export function DashboardPage() {
   const { language, t } = useTranslation();
+  const user = useAuthStore((state: any) => state.user);
+  
+  const [coursesCount, setCoursesCount] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [recentActivities] = useState<any[]>([]);
+  const [upcomingSchedule] = useState<any[]>([]);
 
-  const greeting = language === 'uz' ? 'Xayrli kun, Admin 👋' : language === 'ru' ? 'Добрый день, Администратор 👋' : 'Good afternoon, Admin 👋';
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const response = await apiClient<{ success: boolean; data: any[] }>('/courses', { requireAuth: true });
+        if (response && response.success && Array.isArray(response.data)) {
+          setCoursesCount(response.data.length);
+        } else {
+          setCoursesCount(0);
+        }
+      } catch (err) {
+        console.error('Failed to load courses count', err);
+        setCoursesCount(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboardData();
+  }, []);
+
+  const displayName = user ? `${user.firstName} ${user.lastName}`.trim() : 'User';
+
+  const greeting = language === 'uz' 
+    ? `Xayrli kun, ${displayName} 👋` 
+    : language === 'ru' 
+      ? `Добрый день, ${displayName} 👋` 
+      : `Good afternoon, ${displayName} 👋`;
+
   const desc = language === 'uz' ? "Bugun kampusingizda sodir bo'layotgan voqealar." : language === 'ru' ? 'Вот что происходит в вашем кампусе сегодня.' : "Here's what's happening at your campus today.";
   const todayLabel = language === 'uz' ? 'Bugun' : language === 'ru' ? 'Сегодня' : 'Today';
   const viewReportsLabel = language === 'uz' ? 'Hisobotlar' : language === 'ru' ? 'Отчеты' : 'View Reports';
   const fromLastMonthLabel = language === 'uz' ? "o'tgan oydan beri" : language === 'ru' ? 'с прошлого месяца' : 'from last month';
   const viewAllLabel = language === 'uz' ? "Hammasini ko'rish" : language === 'ru' ? 'Показать все' : 'View All';
   const fullCalendarLabel = language === 'uz' ? "To'liq kalendar" : language === 'ru' ? 'Весь календарь' : 'Full Calendar';
+
+  const stats = [
+    {
+      title: 'Total Students',
+      value: '0',
+      change: '0%',
+      trend: 'positive' as const,
+      icon: Users,
+      iconColor: 'purple',
+    },
+    {
+      title: 'Active Courses',
+      value: loading ? '...' : (coursesCount !== null ? String(coursesCount) : '0'),
+      change: '0%',
+      trend: 'positive' as const,
+      icon: BookOpen,
+      iconColor: 'green',
+    },
+    {
+      title: 'Today\'s Attendance',
+      value: '0%',
+      change: '0%',
+      trend: 'positive' as const,
+      icon: ClipboardCheck,
+      iconColor: 'amber',
+    },
+    {
+      title: 'Avg. Grade',
+      value: 'N/A',
+      change: '0%',
+      trend: 'negative' as const,
+      icon: TrendingUp,
+      iconColor: 'red',
+    },
+  ];
 
   const getTranslatedTitle = (title: string) => {
     if (title === 'Total Students') return t('totalStudents');
@@ -136,41 +155,47 @@ export function DashboardPage() {
             <button className="btn btn-ghost btn-sm">{viewAllLabel}</button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            {recentActivities.map((activity, i) => (
-              <div
-                key={i}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-3)',
-                  padding: 'var(--space-2) 0',
-                  borderBottom: i < recentActivities.length - 1
-                    ? '1px solid var(--border-subtle)' : 'none',
-                }}
-              >
-                <div className="avatar avatar-sm">{activity.avatar}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '0.875rem' }}>
-                    <strong>{activity.user}</strong>{' '}
-                    <span style={{ color: 'var(--text-secondary)' }}>
-                      {activity.action}
-                    </span>{' '}
-                    <span style={{ color: 'var(--text-accent)' }}>
-                      {activity.target}
-                    </span>
-                  </div>
-                </div>
-                <span
+            {recentActivities.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
+                {t('noRecentActivity') || 'No recent activity'}
+              </div>
+            ) : (
+              recentActivities.map((activity, i) => (
+                <div
+                  key={i}
                   style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--text-tertiary)',
-                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-3)',
+                    padding: 'var(--space-2) 0',
+                    borderBottom: i < recentActivities.length - 1
+                      ? '1px solid var(--border-subtle)' : 'none',
                   }}
                 >
-                  {activity.time}
-                </span>
-              </div>
-            ))}
+                  <div className="avatar avatar-sm">{activity.avatar}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.875rem' }}>
+                      <strong>{activity.user}</strong>{' '}
+                      <span style={{ color: 'var(--text-secondary)' }}>
+                        {activity.action}
+                      </span>{' '}
+                      <span style={{ color: 'var(--text-accent)' }}>
+                        {activity.target}
+                      </span>
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--text-tertiary)',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {activity.time}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -181,58 +206,64 @@ export function DashboardPage() {
             <button className="btn btn-ghost btn-sm">{fullCalendarLabel}</button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            {upcomingSchedule.map((item, i) => (
-              <div
-                key={i}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-4)',
-                  padding: 'var(--space-3)',
-                  background: 'var(--bg-elevated)',
-                  borderRadius: 'var(--radius-lg)',
-                  border: '1px solid var(--border-subtle)',
-                }}
-              >
+            {upcomingSchedule.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
+                {t('noUpcomingSchedule') || 'No upcoming schedule'}
+              </div>
+            ) : (
+              upcomingSchedule.map((item, i) => (
                 <div
+                  key={i}
                   style={{
-                    width: '3px',
-                    height: '40px',
-                    borderRadius: '2px',
-                    background:
-                      item.status === 'In Progress'
-                        ? 'var(--color-accent-500)'
-                        : 'var(--color-primary-500)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-4)',
+                    padding: 'var(--space-3)',
+                    background: 'var(--bg-elevated)',
+                    borderRadius: 'var(--radius-lg)',
+                    border: '1px solid var(--border-subtle)',
                   }}
-                />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '2px' }}>
-                    {item.title}
-                  </div>
+                >
                   <div
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 'var(--space-3)',
-                      fontSize: '0.75rem',
-                      color: 'var(--text-tertiary)',
+                      width: '3px',
+                      height: '40px',
+                      borderRadius: '2px',
+                      background:
+                        item.status === 'In Progress'
+                          ? 'var(--color-accent-500)'
+                          : 'var(--color-primary-500)',
                     }}
-                  >
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Clock size={12} /> {item.time}
-                    </span>
-                    <span>{item.room}</span>
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '2px' }}>
+                      {item.title}
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--space-3)',
+                        fontSize: '0.75rem',
+                        color: 'var(--text-tertiary)',
+                      }}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Clock size={12} /> {item.time}
+                      </span>
+                      <span>{item.room}</span>
+                    </div>
                   </div>
+                  <span
+                    className={`badge ${
+                      item.status === 'In Progress' ? 'badge-success' : 'badge-info'
+                    }`}
+                  >
+                    {item.status === 'In Progress' ? t('inProgress') : t('upcoming')}
+                  </span>
                 </div>
-                <span
-                  className={`badge ${
-                    item.status === 'In Progress' ? 'badge-success' : 'badge-info'
-                  }`}
-                >
-                  {item.status === 'In Progress' ? t('inProgress') : t('upcoming')}
-                </span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>

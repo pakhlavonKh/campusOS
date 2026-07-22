@@ -8,6 +8,7 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "paths": {
+      "@campusos/shared": ["../../packages/shared/dist/index.d.ts"],
       "@modules/*": ["src/modules/*"],
       "@common/*": ["src/common/*"],
       "@shared/*": ["src/shared/*"],

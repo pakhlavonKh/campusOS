@@ -5,15 +5,15 @@ services:
     image: postgres:16-alpine
     container_name: campusos-postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: admin123
+      POSTGRES_USER: campusos
+      POSTGRES_PASSWORD: password123
       POSTGRES_DB: campusos
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U campusos" ]
+      test: ["CMD-SHELL", "pg_isready -U campusos"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -25,6 +25,46 @@ services:
       - "6379:6379"
     volumes:
       - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  opensearch:
+    image: opensearchproject/opensearch:2.12.0
+    container_name: campusos-opensearch
+    environment:
+      - cluster.name=campusos-cluster
+      - node.name=campusos-node1
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - DISABLE_SECURITY_PLUGIN=true
+    ports:
+      - "9200:9200"
+    volumes:
+      - opensearchdata:/usr/share/opensearch/data
+
+  minio:
+    image: minio/minio:latest
+    container_name: campusos-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadminpassword
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: campusos-mailhog
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
 
   backend:
     build:
@@ -34,20 +74,24 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_USERNAME=campusos
-      - DB_PASSWORD=password123
-      - DB_DATABASE=campusos
+      - DB_USER=campusos
+      - DB_PASS=password123
+      - DB_NAME=campusos
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - OPENSEARCH_NODE=http://opensearch:9200
+      - S3_ENDPOINT=http://minio:9000
+      - SMTP_HOST=mailhog
+      - SMTP_PORT=1025
       - JWT_SECRET=super_secret_jwt_key_change_me_in_prod
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
 
   web:
     build:
@@ -55,10 +99,12 @@ services:
       dockerfile: apps/web/Dockerfile
     container_name: campusos-web
     ports:
-      - "5173:80" # Mapping to Nginx default port
+      - "5173:80"
     depends_on:
       - backend
 
 volumes:
   pgdata:
   redisdata:
+  opensearchdata:
+  miniodata:
