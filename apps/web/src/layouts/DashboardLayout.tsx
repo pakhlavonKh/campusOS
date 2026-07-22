@@ -12,8 +12,6 @@ import {
   LogOut,
   GraduationCap,
   MessageCircle,
-  ShieldAlert,
-  Building2,
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth.store';
 import { useTranslation, LanguageSwitcher } from '../providers/LanguageProvider';
@@ -46,13 +44,6 @@ const navItems = [
       { to: '/users', label: 'Users', key: 'users', icon: Users },
       { to: '/analytics', label: 'Analytics', key: 'analytics', icon: BarChart3 },
       { to: '/settings', label: 'Settings', key: 'settings', icon: Settings },
-    ],
-  },
-  {
-    section: 'superAdmin',
-    links: [
-      { to: '/admin', label: 'Global Dashboard', key: 'globalDashboard', icon: ShieldAlert },
-      { to: '/admin/organizations', label: 'Organizations', key: 'organizations', icon: Building2 },
     ],
   },
 ];

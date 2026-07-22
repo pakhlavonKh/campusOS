@@ -5,6 +5,7 @@
     "rootDir": "./src",
     "baseUrl": "./",
     "strictPropertyInitialization": false,
+    "skipLibCheck": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "paths": {

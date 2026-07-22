@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { DataSource } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 /**
  * CompletionService
@@ -129,7 +128,7 @@ export class CompletionService {
   async getCourseProgress(
     courseId: string,
     userId: string,
-    organizationId: string,
+    _organizationId: string,
   ): Promise<{ totalLessons: number; completedLessons: number; percentage: number; courseComplete: boolean }> {
     const [{ total }] = await this.dataSource.query(
       `SELECT COUNT(*) AS total FROM lessons l JOIN modules m ON m.id = l.module_id WHERE m.course_id = $1`,

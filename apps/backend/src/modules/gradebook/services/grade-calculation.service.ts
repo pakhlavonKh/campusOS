@@ -121,12 +121,13 @@ export class GradeCalculationService {
       case GradeScaleType.PASS_FAIL:
         return percentage >= 60 ? 'Pass' : 'Fail';
 
-      case GradeScaleType.CUSTOM:
+      case GradeScaleType.CUSTOM: {
         if (!customMappings?.length) return `${percentage.toFixed(1)}%`;
         const match = customMappings
           .sort((a, b) => b.minScore - a.minScore)
           .find((m) => percentage >= m.minScore && percentage <= m.maxScore);
         return match?.label ?? `${percentage.toFixed(1)}%`;
+      }
 
       default:
         return `${percentage.toFixed(1)}%`;

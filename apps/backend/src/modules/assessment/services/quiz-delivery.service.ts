@@ -1,9 +1,6 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
-import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { RealtimeGateway } from '../../../shared/gateways/realtime.gateway';
 
 /**
@@ -74,8 +71,8 @@ export class QuizDeliveryService {
   async submitAttempt(
     attemptId: string,
     userId: string,
-    organizationId: string,
-    answers: Record<string, any>,
+    _organizationId: string,
+    _answers: Record<string, any>,
   ): Promise<{ status: 'submitted' }> {
     // Cancel scheduled auto-submit job
     const job = await this.quizTimeoutQueue.getJob(`quiz-timeout:${attemptId}`);
@@ -92,7 +89,7 @@ export class QuizDeliveryService {
   }
 
   /** Called by BullMQ worker when timeout fires. */
-  async autoSubmit(attemptId: string, userId: string, organizationId: string): Promise<void> {
+  async autoSubmit(attemptId: string, userId: string, _organizationId: string): Promise<void> {
     this.logger.warn(`Auto-submitting attempt ${attemptId} (time limit exceeded)`);
 
     // Notify student their exam was auto-submitted

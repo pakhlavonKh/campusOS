@@ -31,5 +31,9 @@
     "@typescript-eslint/parser": "^7.1.0",
     "eslint": "^8.57.0",
     "turbo": "^1.13.0"
+  },
+  "dependencies": {
+    "expo": "^57.0.7",
+    "react-native-web": "^0.21.2"
   }
 }

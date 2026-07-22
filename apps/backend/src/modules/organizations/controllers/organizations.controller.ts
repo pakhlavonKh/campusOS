@@ -92,12 +92,32 @@ export class OrganizationsController {
   @Get(':slug/white-label/public')
   @ApiOperation({ summary: 'Get white-label styling config by slug (Public for frontend boot)' })
   async getWhiteLabelPublic(@Param('slug') slug: string) {
-    const org = await this.orgService.findBySlug(slug);
-    const config = await this.orgService.getWhiteLabelConfig(org.id);
-    return {
-      success: true,
-      data: config,
-    };
+    try {
+      const org = await this.orgService.findBySlug(slug);
+      const config = await this.orgService.getWhiteLabelConfig(org.id);
+      return {
+        success: true,
+        data: config,
+      };
+    } catch {
+      // Fallback default theme when org is unseeded
+      return {
+        success: true,
+        data: {
+          tier: 'token',
+          tokens: {
+            colorPrimary: '#6366f1',
+            colorSecondary: '#4f46e5',
+            fontFamily: 'Inter',
+            logoUrl: null,
+            faviconUrl: null,
+            customDomain: null,
+          },
+          layoutVariant: null,
+          customBuildRef: null,
+        },
+      };
+    }
   }
 
   @ApiBearerAuth()

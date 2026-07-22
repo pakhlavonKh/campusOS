@@ -9,8 +9,6 @@ import { AttendancePage } from './pages/attendance/AttendancePage';
 import { MessagingPage } from './pages/messaging/MessagingPage';
 import { GradebookPage } from './pages/gradebook/GradebookPage';
 import { DiscussionsPage } from './pages/collaboration/DiscussionsPage';
-import { SuperAdminDashboard } from './pages/admin/SuperAdminDashboard';
-import { OrganizationsPage } from './pages/admin/OrganizationsPage';
 import { useDesktop } from './hooks/useDesktop';
 
 // Theme Switcher for testing Tiers 1 & 2 of the Whitelabeling Architecture
@@ -102,10 +100,6 @@ function App() {
         <Route path="/messaging" element={<MessagingPage />} />
         <Route path="/gradebook" element={<GradebookPage />} />
         <Route path="/discussions" element={<DiscussionsPage />} />
-        
-        {/* Super Admin */}
-        <Route path="/admin" element={<SuperAdminDashboard />} />
-        <Route path="/admin/organizations" element={<OrganizationsPage />} />
       </Route>
 
       {/* Default redirect */}

@@ -17,7 +17,7 @@ export class AuditInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
-    const { method, url, headers, ip } = request;
+    const { method, url } = request;
 
     // Only audit modifying actions
     const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);

@@ -1,5 +1,4 @@
 import { Entity, Column, Index } from 'typeorm';
-import { PlatformEntity } from '../../../shared/entities/base.entity';
 
 /**
  * Audit Log — immutable record of all security-sensitive operations.

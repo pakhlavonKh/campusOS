@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { DataSource } from 'typeorm';
 
 /**
  * GamificationListenerService
@@ -165,7 +164,7 @@ export class GamificationListenerService {
     userId: string,
     organizationId: string,
     trigger: string,
-    context: Record<string, any>,
+    _context: Record<string, any>,
   ) {
     // Badge evaluation is rule-based. This stub emits an event for
     // the BadgeEvaluatorService to pick up asynchronously.
