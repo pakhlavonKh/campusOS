@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   ParseUUIDPipe,
+  ForbiddenException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -23,19 +24,21 @@ class CreateCourseDto {
   @IsString() title: string;
   @IsString() @IsOptional() description?: string;
   @IsEnum(['topic_based', 'week_based', 'semester_based', 'self_paced', 'instructor_led'])
-  @IsOptional() format?: string;
+  format?: 'topic_based' | 'week_based' | 'semester_based' | 'self_paced' | 'instructor_led';
   @IsUUID() @IsOptional() subjectId?: string;
   @IsUUID() @IsOptional() branchId?: string;
 }
 
 class CreateModuleDto {
   @IsString() title: string;
+  @IsString() @IsOptional() description?: string;
   @IsOptional() position?: number;
   @IsUUID() @IsOptional() parentModuleId?: string;
 }
 
 class CreateLessonDto {
   @IsString() title: string;
+  @IsString() contentType: string;
   @IsOptional() position?: number;
 }
 
@@ -52,12 +55,19 @@ export class CourseController {
   async create(
     @Body() dto: CreateCourseDto,
     @TenantId() organizationId: string,
-    @CurrentUser('sub') userId: string,
+    @CurrentUser() user: any,
   ) {
+    const roles: string[] = user?.roles || [];
+    const adminRoles = ['admin', 'super_admin', 'org_admin', 'branch_admin'];
+    const isAdmin = roles.some((r) => adminRoles.includes(r.toLowerCase()));
+    if (!isAdmin) {
+      throw new ForbiddenException('Only administrators are permitted to create new courses');
+    }
+
     const course = await this.courseService.create({
       ...dto,
       organizationId,
-      createdBy: userId,
+      createdBy: user?.sub,
     });
     return { success: true, data: course, timestamp: new Date().toISOString() };
   }

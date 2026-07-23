@@ -1,9 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Send, Search, Paperclip, Smile, MoreVertical, Plus, X, FileText } from 'lucide-react';
 import { messagingService, Conversation, Message } from '../../api/services/messaging.service';
 import { storageService } from '../../api/services/storage.service';
+import { useAuthStore } from '../../store/auth.store';
 
 export function MessagingPage() {
+  const user = useAuthStore((state: any) => state.user);
+  const userRole = (user?.role || user?.roles?.[0] || 'student').toLowerCase();
+
+  if (userRole === 'parent') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConvoId, setSelectedConvoId] = useState<string>('');
   const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>({});

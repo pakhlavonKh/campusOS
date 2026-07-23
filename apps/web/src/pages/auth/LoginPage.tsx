@@ -50,38 +50,60 @@ export function LoginPage() {
     try {
       const response = await authService.login({ email, password });
       if (response.success) {
+        // Role MUST come from the backend JWT payload — never from client-side inference.
+        const backendRoles: string[] = (response.data.user as any)?.roles || [];
+        const backendRole: string = backendRoles[0] || '';
         const userObj = {
           ...response.data.user,
-          role: (response.data.user as any)?.roles?.[0] || effectiveRole,
-          roles: (response.data.user as any)?.roles || [effectiveRole],
+          role: backendRole,
+          roles: backendRoles,
         };
         setAuth(
           response.data.accessToken,
           userObj,
           response.data.organizationId,
           response.data.theme as any
+          // memberships would come from response.data.memberships in a full implementation
         );
         navigate('/dashboard');
       }
     } catch (err: any) {
-      console.warn('Backend login fallback for preview:', err);
-      // Dynamic Auth payload with assigned role
-      const namePart = email.split('@')[0] || 'User';
-      const formattedName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
-      
-      setAuth(
-        'demo_access_token_123',
-        {
-          id: `u_${Date.now()}`,
-          email,
-          firstName: formattedName,
-          lastName: effectiveRole.toUpperCase().replace('_', ' '),
-          role: effectiveRole,
-          roles: [effectiveRole],
-        },
-        'default-org'
-      );
-      navigate('/dashboard');
+      /**
+       * DEMO / DEVELOPMENT FALLBACK ONLY.
+       *
+       * This block synthesizes a session when the backend is unavailable.
+       * It is intentionally gated to development mode (import.meta.env.DEV).
+       *
+       * SRS §5.1 SECURITY NOTE: In production this fallback MUST NOT exist.
+       * The role is authority-derived from the JWT claims issued by the backend.
+       * Client-side role inference is not a valid substitute.
+       */
+      if (import.meta.env.DEV) {
+        console.warn('[DEV ONLY] Backend unreachable — using demo fallback session:', err);
+        const namePart = email.split('@')[0] || 'User';
+        const formattedName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+
+        setAuth(
+          'demo_access_token_dev',
+          {
+            id: `u_${Date.now()}`,
+            email,
+            firstName: formattedName,
+            lastName: effectiveRole.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+            role: effectiveRole,
+            roles: [effectiveRole],
+          },
+          'default-org-dev',
+        );
+        navigate('/dashboard');
+      } else {
+        // Production: surface the actual error to the user.
+        const message =
+          (err as any)?.response?.data?.message ||
+          (err as Error)?.message ||
+          'Login failed. Please check your credentials and try again.';
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }

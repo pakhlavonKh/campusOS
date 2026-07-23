@@ -21,7 +21,7 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const base = 'inline-flex items-center justify-center font-medium rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed';
-  
+
   const sizes = {
     sm: 'px-3 py-1.5 text-xs gap-1.5',
     md: 'px-4 py-2 text-sm gap-2',
@@ -129,5 +129,38 @@ export const Input: React.FC<InputProps> = ({ label, error, hint, className = ''
       {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
       {hint && !error && <p className="text-xs text-[var(--text-muted)] mt-1">{hint}</p>}
     </div>
+  );
+};
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
+export interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title?: string;
+  children: React.ReactNode;
+}
+
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-lg rounded-xl bg-[var(--bg-surface)] p-6 shadow-xl border border-[var(--border-color)] animate-fade-in">
+        <div className="flex items-center justify-between mb-4 border-b border-[var(--border-color)] pb-3">
+          {title && <h2 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h2>}
+          <button onClick={onClose} className="text-gray-400 hover:text-white p-1 rounded-lg">✕</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+};
+
+// ── Spinner ───────────────────────────────────────────────────────────────────
+
+export const Spinner: React.FC<{ size?: 'sm' | 'md' | 'lg' }> = ({ size = 'md' }) => {
+  const dims = { sm: 'w-4 h-4', md: 'w-6 h-6', lg: 'w-8 h-8' };
+  return (
+    <div className={`animate-spin rounded-full border-2 border-slate-300 border-t-[var(--color-primary)] ${dims[size]}`} />
   );
 };

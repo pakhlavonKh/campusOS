@@ -2,7 +2,7 @@ import { Controller, Get, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AnalyticsService } from '../services/analytics.service';
-import { TenantId } from '../../../common/decorators/tenant.decorator';
+import { TenantId, CurrentUser } from '../../../common/decorators/tenant.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 
 @ApiTags('analytics')
@@ -14,15 +14,21 @@ export class AnalyticsController {
 
   @Get('courses/grades')
   @Permissions('analytics:read')
-  async getCourseAverages(@TenantId() organizationId: string) {
-    const data = await this.analyticsService.getCourseAverages(organizationId);
+  async getCourseAverages(
+    @TenantId() organizationId: string,
+    @CurrentUser() user: any,
+  ) {
+    const data = await this.analyticsService.getCourseAverages(organizationId, user);
     return { success: true, data };
   }
 
   @Get('courses/attendance')
   @Permissions('analytics:read')
-  async getAttendanceRates(@TenantId() organizationId: string) {
-    const data = await this.analyticsService.getAttendanceRates(organizationId);
+  async getAttendanceRates(
+    @TenantId() organizationId: string,
+    @CurrentUser() user: any,
+  ) {
+    const data = await this.analyticsService.getAttendanceRates(organizationId, user);
     return { success: true, data };
   }
 }

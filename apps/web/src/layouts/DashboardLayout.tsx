@@ -12,9 +12,18 @@ import {
   GraduationCap,
   MessageCircle,
   Building2,
+  Calendar,
+  CreditCard,
+  BarChart3,
+  GitBranch,
+  Phone,
+  User,
+  FileText,
+  Mic,
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth.store';
 import { useTranslation, LanguageSwitcher } from '../providers/LanguageProvider';
+import { ContextSwitcher } from '../components/auth/ContextSwitcher';
 
 interface NavLinkItem {
   to: string;
@@ -34,32 +43,53 @@ const allNavSections: NavSection[] = [
   {
     section: 'overview',
     links: [
-      { to: '/dashboard', label: 'Dashboard', key: 'dashboard', icon: LayoutDashboard },
-      { to: '/organizations', label: 'Organizations', key: 'organizations', icon: Building2, roles: ['super_admin'] },
+      { to: '/dashboard',     label: 'Dashboard',     key: 'dashboard',     icon: LayoutDashboard },
+      { to: '/organizations', label: 'Organizations',  key: 'organizations', icon: Building2,        roles: ['super_admin'] },
+      { to: '/notifications', label: 'Notifications',  key: 'notifications', icon: Bell },
     ],
   },
   {
     section: 'academic',
     roles: ['super_admin', 'org_admin', 'branch_admin', 'teacher', 'assistant_teacher', 'student'],
     links: [
-      { to: '/courses', label: 'Courses', key: 'courses', icon: BookOpen, roles: ['super_admin', 'org_admin', 'branch_admin', 'teacher', 'assistant_teacher', 'student'] },
+      { to: '/courses',    label: 'Courses',    key: 'courses',    icon: BookOpen,      roles: ['super_admin', 'org_admin', 'branch_admin', 'teacher', 'assistant_teacher', 'student'] },
       { to: '/attendance', label: 'Attendance', key: 'attendance', icon: ClipboardCheck },
-      { to: '/gradebook', label: 'Gradebook', key: 'gradebook', icon: GraduationCap },
+      { to: '/gradebook',  label: 'Gradebook',  key: 'gradebook',  icon: GraduationCap },
+      { to: '/assessments',label: 'Assessments',key: 'assessments',icon: FileText },
+      { to: '/voice',      label: 'Voice Studio',key:'voice',      icon: Mic },
+      { to: '/schedule',   label: 'Schedule',   key: 'schedule',   icon: Calendar,      roles: ['super_admin', 'org_admin', 'branch_admin', 'teacher', 'assistant_teacher', 'student'] },
+      { to: '/groups',     label: 'Groups',     key: 'groups',     icon: Users,         roles: ['super_admin', 'org_admin', 'branch_admin', 'teacher', 'assistant_teacher'] },
     ],
   },
   {
     section: 'communication',
     links: [
-      { to: '/messaging', label: 'Messaging', key: 'messaging', icon: MessageSquare },
-      { to: '/discussions', label: 'Discussions', key: 'discussions', icon: MessageCircle, roles: ['super_admin', 'org_admin', 'branch_admin', 'teacher', 'assistant_teacher', 'student'] },
+      { to: '/messaging',    label: 'Messaging',    key: 'messaging',    icon: MessageSquare, roles: ['super_admin', 'org_admin', 'branch_admin', 'teacher', 'assistant_teacher', 'student', 'parent'] },
+      { to: '/discussions',  label: 'Discussions',  key: 'discussions',  icon: MessageCircle, roles: ['super_admin', 'org_admin', 'branch_admin', 'teacher', 'assistant_teacher'] },
+    ],
+  },
+  {
+    section: 'finance',
+    roles: ['super_admin', 'org_admin', 'branch_admin', 'parent'],
+    links: [
+      { to: '/payments', label: 'Payments', key: 'payments', icon: CreditCard, roles: ['super_admin', 'org_admin', 'branch_admin', 'parent'] },
     ],
   },
   {
     section: 'system',
     roles: ['super_admin', 'org_admin', 'branch_admin'],
     links: [
-      { to: '/users', label: 'Users', key: 'users', icon: Users, roles: ['super_admin', 'org_admin', 'branch_admin'] },
-      { to: '/settings', label: 'Settings', key: 'settings', icon: Settings, roles: ['super_admin', 'org_admin', 'branch_admin'] },
+      { to: '/users',     label: 'Users',     key: 'users',     icon: Users,     roles: ['super_admin', 'org_admin', 'branch_admin'] },
+      { to: '/branches',  label: 'Branches',  key: 'branches',  icon: GitBranch, roles: ['super_admin', 'org_admin'] },
+      { to: '/analytics', label: 'Analytics', key: 'analytics', icon: BarChart3, roles: ['super_admin', 'org_admin', 'branch_admin'] },
+      { to: '/crm',       label: 'CRM',       key: 'crm',       icon: Phone,     roles: ['super_admin', 'org_admin'] },
+      { to: '/settings',  label: 'Settings',  key: 'settings',  icon: Settings,  roles: ['super_admin', 'org_admin', 'branch_admin'] },
+    ],
+  },
+  {
+    section: 'account',
+    links: [
+      { to: '/profile', label: 'My Profile', key: 'profile', icon: User },
     ],
   },
 ];
@@ -69,11 +99,19 @@ export function DashboardLayout() {
   const navigate = useNavigate();
   const logout = useAuthStore((state: any) => state.logout);
   const user = useAuthStore((state: any) => state.user);
+  const activeMembership = useAuthStore((state) => state.activeMembership);
   const whiteLabelConfig = useAuthStore((state: any) => state.whiteLabelConfig);
   const layoutVariant = whiteLabelConfig?.layoutVariant || 'sidebar';
   const { t } = useTranslation();
 
-  const userRole = (user?.role || user?.roles?.[0] || 'student').toLowerCase();
+  // SRS §5.30: role is resolved from the active membership context.
+  // Falls back to the flat user.role for single-membership / legacy sessions.
+  const userRole = (
+    activeMembership?.role ||
+    user?.role ||
+    user?.roles?.[0] ||
+    'student'
+  ).toLowerCase();
 
   const handleLogout = () => {
     logout();
@@ -187,6 +225,8 @@ export function DashboardLayout() {
               <input placeholder={t('searchPlaceholder')} />
             </div>
             <LanguageSwitcher />
+            {/* SRS §5.30 — context switcher shown only when user has multiple memberships */}
+            <ContextSwitcher compact />
             <button className="btn btn-ghost btn-icon" title="Notifications">
               <Bell size={20} />
             </button>
@@ -257,6 +297,11 @@ export function DashboardLayout() {
             borderTop: '1px solid var(--border-color)',
           }}
         >
+          {/* SRS §5.30 — context switcher for multi-membership users */}
+          <div style={{ padding: '0 var(--space-3) var(--space-2)' }}>
+            <ContextSwitcher />
+          </div>
+
           <div
             style={{
               display: 'flex',

@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, UseGuards, ParseUUIDPipe, ForbiddenException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { GradebookService } from '../services/gradebook.service';
@@ -60,7 +60,16 @@ export class GradebookController {
     @Param('courseId', ParseUUIDPipe) courseId: string,
     @Param('studentId', ParseUUIDPipe) studentId: string,
     @TenantId() organizationId: string,
+    @CurrentUser() user: any,
   ) {
+    const roles: string[] = user?.roles || [];
+    const adminOrTeacherRoles = ['admin', 'super_admin', 'org_admin', 'branch_admin', 'teacher', 'instructor'];
+    const isStudentOnly = roles.some((r) => r.toLowerCase() === 'student') && !roles.some((r) => adminOrTeacherRoles.includes(r.toLowerCase()));
+
+    if (isStudentOnly && user?.sub && studentId !== user.sub) {
+      throw new ForbiddenException('Students can only view their own grades');
+    }
+
     const data = await this.gradebookService.getStudentGrades(studentId, courseId, organizationId);
     const overall = await this.gradebookService.calculateCourseGrade(studentId, courseId, organizationId);
     return { success: true, data: { entries: data, overallGrade: overall } };

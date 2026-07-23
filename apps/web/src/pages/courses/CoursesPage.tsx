@@ -22,7 +22,11 @@ export function CoursesPage() {
   const [newSubject, setNewSubject] = useState('Computer Science');
   const [newFormat, setNewFormat] = useState('instructor_led');
   const [newDescription, setNewDescription] = useState('');
+
+  const user = useAuthStore((state: any) => state.user);
   const organizationId = useAuthStore((state) => state.organizationId);
+  const userRole = (user?.role || user?.roles?.[0] || 'student').toLowerCase();
+  const isAdmin = ['super_admin', 'org_admin', 'branch_admin', 'admin'].includes(userRole);
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -44,6 +48,7 @@ export function CoursesPage() {
 
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) return;
     if (!newTitle.trim()) return;
 
     const newCourseObj: Course = {
@@ -96,10 +101,12 @@ export function CoursesPage() {
           <h1>Courses</h1>
           <p>Manage your curriculum and course content</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-          <Plus size={16} />
-          New Course
-        </button>
+        {isAdmin && (
+          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <Plus size={16} />
+            New Course
+          </button>
+        )}
       </div>
 
       {/* Filters */}

@@ -156,14 +156,24 @@ export class AttendanceService {
   }
 
   /**
-   * Calculate summary statistics for an organization
+   * Calculate summary statistics for an organization (or student)
    */
   async getDailyStats(
     organizationId: string,
     date: string,
+    user?: any,
   ): Promise<{ present: number; absent: number; late: number; excused: number; rate: number }> {
+    const roles: string[] = user?.roles || [];
+    const adminOrTeacherRoles = ['admin', 'super_admin', 'org_admin', 'branch_admin', 'teacher', 'instructor'];
+    const isStudentOnly = roles.some((r) => r.toLowerCase() === 'student') && !roles.some((r) => adminOrTeacherRoles.includes(r.toLowerCase()));
+
+    const whereClause: any = { organizationId, date };
+    if (isStudentOnly && user?.sub) {
+      whereClause.studentId = user.sub;
+    }
+
     const records = await this.recordRepo.find({
-      where: { organizationId, date },
+      where: whereClause,
     });
 
     const stats = {

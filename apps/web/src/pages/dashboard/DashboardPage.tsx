@@ -21,12 +21,19 @@ import { apiClient } from '../../api/client';
 export function DashboardPage() {
   const { language } = useTranslation();
   const user = useAuthStore((state: any) => state.user);
+  const activeMembership = useAuthStore((state) => state.activeMembership);
   const navigate = useNavigate();
   
   const [coursesCount, setCoursesCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const userRole = (user?.role || user?.roles?.[0] || 'student').toLowerCase();
+  // SRS §5.30: role resolved from active membership context; fallback to flat role.
+  const userRole = (
+    activeMembership?.role ||
+    user?.role ||
+    user?.roles?.[0] ||
+    'student'
+  ).toLowerCase();
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -206,7 +213,7 @@ export function DashboardPage() {
     }
   };
 
-  const stats = getRoleStats();
+  const stats = getRoleStats() || [];
 
   return (
     <div className="animate-fade-in">
@@ -233,8 +240,8 @@ export function DashboardPage() {
             </button>
           )}
           {userRole === 'parent' && (
-            <button className="btn btn-primary" onClick={() => navigate('/messaging')}>
-              <MessageSquare size={16} /> Message Teachers
+            <button className="btn btn-primary" onClick={() => navigate('/attendance')}>
+              <ClipboardCheck size={16} /> View Attendance
             </button>
           )}
         </div>
@@ -267,114 +274,97 @@ export function DashboardPage() {
       </div>
 
       {/* Two-column Content Section */}
-      <div className="content-grid" style={{ marginTop: 'var(--space-6)' }}>
-        {/* Role-tailored Panel 1 */}
-        <div className="card">
-          <div className="card-header">
-            <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>
-              {userRole === 'teacher'
-                ? 'Upcoming Classes & Schedule'
-                : userRole === 'parent'
-                ? 'Recent Grade Releases'
-                : userRole === 'super_admin'
-                ? 'System Platform Activity'
-                : 'My Upcoming Deadlines'}
-            </h3>
+      {userRole !== 'parent' && (
+        <div className="content-grid" style={{ marginTop: 'var(--space-6)' }}>
+          {/* Role-tailored Panel 1 */}
+          <div className="card">
+            <div className="card-header">
+              <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>
+                {userRole === 'teacher'
+                  ? 'Upcoming Classes & Schedule'
+                  : userRole === 'super_admin'
+                  ? 'System Platform Activity'
+                  : 'My Upcoming Deadlines'}
+              </h3>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              {userRole === 'teacher' ? (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-3)', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>CS301 Data Structures</div>
+                      <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Lecture Hall B • 45 Enrolled</div>
+                    </div>
+                    <span className="badge badge-info">10:00 AM Today</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-3)', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>PHYS101 General Physics</div>
+                      <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Science Lab 3 • 32 Enrolled</div>
+                    </div>
+                    <span className="badge badge-purple">02:30 PM Today</span>
+                  </div>
+                </>
+              ) : userRole === 'super_admin' ? (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-3)', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>Tenant Springfield University Registered</div>
+                      <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Enterprise Billing Plan</div>
+                    </div>
+                    <span className="badge badge-purple">Just Now</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-3)', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>Database RLS Migration Executed</div>
+                      <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Multi-tenant security policies active</div>
+                    </div>
+                    <span className="badge badge-success">Success</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-3)', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>Problem Set 4: Binary Search Trees</div>
+                      <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>CS301 Data Structures</div>
+                    </div>
+                    <span className="badge badge-warning">Due in 2 days</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-3)', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>Quantum Entanglement Lab Report</div>
+                      <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>PHYS101 General Physics</div>
+                    </div>
+                    <span className="badge badge-info">Due in 5 days</span>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            {userRole === 'teacher' ? (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-3)', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>CS301 Data Structures</div>
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Lecture Hall B • 45 Enrolled</div>
-                  </div>
-                  <span className="badge badge-info">10:00 AM Today</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-3)', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>PHYS101 General Physics</div>
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Science Lab 3 • 32 Enrolled</div>
-                  </div>
-                  <span className="badge badge-purple">02:30 PM Today</span>
-                </div>
-              </>
-            ) : userRole === 'parent' ? (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-3)', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>Problem Set 4: BST Search Algorithms</div>
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Data Structures • Submitted</div>
-                  </div>
-                  <span className="badge badge-success">98 / 100</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-3)', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>Midterm Physics Exam</div>
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>General Physics I</div>
-                  </div>
-                  <span className="badge badge-success">94 / 100</span>
-                </div>
-              </>
-            ) : userRole === 'super_admin' ? (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-3)', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>Tenant Springfield University Registered</div>
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Enterprise Billing Plan</div>
-                  </div>
-                  <span className="badge badge-purple">Just Now</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-3)', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>Database RLS Migration Executed</div>
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Multi-tenant security policies active</div>
-                  </div>
-                  <span className="badge badge-success">Success</span>
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-3)', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>Problem Set 4: Binary Search Trees</div>
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>CS301 Data Structures</div>
-                  </div>
-                  <span className="badge badge-warning">Due in 2 days</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-3)', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>Quantum Entanglement Lab Report</div>
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>PHYS101 General Physics</div>
-                  </div>
-                  <span className="badge badge-info">Due in 5 days</span>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
 
-        {/* Role-tailored Panel 2 */}
-        <div className="card">
-          <div className="card-header">
-            <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>Quick Actions & Navigation</h3>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-            <button className="btn btn-secondary" onClick={() => navigate('/courses')} style={{ padding: 'var(--space-4)', justifyContent: 'center' }}>
-              <BookOpen size={20} /> Courses
-            </button>
-            <button className="btn btn-secondary" onClick={() => navigate('/attendance')} style={{ padding: 'var(--space-4)', justifyContent: 'center' }}>
-              <ClipboardCheck size={20} /> Attendance
-            </button>
-            <button className="btn btn-secondary" onClick={() => navigate('/gradebook')} style={{ padding: 'var(--space-4)', justifyContent: 'center' }}>
-              <GraduationCap size={20} /> Gradebook
-            </button>
-            <button className="btn btn-secondary" onClick={() => navigate('/messaging')} style={{ padding: 'var(--space-4)', justifyContent: 'center' }}>
-              <MessageSquare size={20} /> Messaging
-            </button>
+          {/* Role-tailored Panel 2 */}
+          <div className="card">
+            <div className="card-header">
+              <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>Quick Actions & Navigation</h3>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+              <button className="btn btn-secondary" onClick={() => navigate('/courses')} style={{ padding: 'var(--space-4)', justifyContent: 'center' }}>
+                <BookOpen size={20} /> Courses
+              </button>
+              <button className="btn btn-secondary" onClick={() => navigate('/attendance')} style={{ padding: 'var(--space-4)', justifyContent: 'center' }}>
+                <ClipboardCheck size={20} /> Attendance
+              </button>
+              <button className="btn btn-secondary" onClick={() => navigate('/gradebook')} style={{ padding: 'var(--space-4)', justifyContent: 'center' }}>
+                <GraduationCap size={20} /> Gradebook
+              </button>
+              <button className="btn btn-secondary" onClick={() => navigate('/messaging')} style={{ padding: 'var(--space-4)', justifyContent: 'center' }}>
+                <MessageSquare size={20} /> Messaging
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

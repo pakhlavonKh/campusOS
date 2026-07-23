@@ -10,6 +10,7 @@ import {
   Download,
 } from 'lucide-react';
 import { attendanceService, AttendanceRecord } from '../../api/services/attendance.service';
+import { useAuthStore } from '../../store/auth.store';
 
 interface AttendanceRow {
   id: string;
@@ -33,6 +34,10 @@ const statusIcons: Record<string, typeof Check> = {
 };
 
 export function AttendancePage() {
+  const user = useAuthStore((state: any) => state.user);
+  const userRole = (user?.role || user?.roles?.[0] || 'student').toLowerCase();
+  const isStudent = userRole === 'student';
+
   const [records, setRecords] = useState<AttendanceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -43,9 +48,14 @@ export function AttendancePage() {
       try {
         const statsRes = await attendanceService.getDailyStats(selectedDate);
         if (statsRes.success && (statsRes.data as any)?.records) {
-          setRecords((statsRes.data as any).records);
+          const rawRecords = (statsRes.data as any).records;
+          if (isStudent && user) {
+            const displayName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+            setRecords(rawRecords.filter((r: AttendanceRow) => r.id === user.id || r.student.toLowerCase().includes(displayName.toLowerCase())));
+          } else {
+            setRecords(rawRecords);
+          }
         } else {
-          // If no records exist for selected date in fresh DB, keep clean empty array
           setRecords([]);
         }
       } catch (err) {
@@ -56,7 +66,7 @@ export function AttendancePage() {
       }
     }
     fetchAttendance();
-  }, [selectedDate]);
+  }, [selectedDate, isStudent, user]);
 
   const summary = {
     present: records.filter((r) => r.status === 'present').length,
@@ -66,6 +76,7 @@ export function AttendancePage() {
   };
 
   const handleStatusChange = async (id: string, newStatus: AttendanceRow['status']) => {
+    if (isStudent) return; // Students cannot edit attendance
     const target = records.find((r) => r.id === id);
     if (!target) return;
 
@@ -88,14 +99,16 @@ export function AttendancePage() {
     <div className="animate-fade-in">
       <div className="page-header">
         <div className="page-header-left">
-          <h1>Attendance Tracking</h1>
-          <p>Daily student attendance roster and summary reports</p>
+          <h1>{isStudent ? 'My Attendance' : 'Attendance Tracking'}</h1>
+          <p>{isStudent ? 'Your personal course attendance summary and status' : 'Daily student attendance roster and summary reports'}</p>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-          <button className="btn btn-secondary">
-            <Download size={16} /> Export Report
-          </button>
-        </div>
+        {!isStudent && (
+          <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+            <button className="btn btn-secondary">
+              <Download size={16} /> Export Report
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Date Navigator */}
@@ -103,7 +116,7 @@ export function AttendancePage() {
         className="card"
         style={{
           display: 'flex',
-          justify: 'space-between',
+          justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: 'var(--space-6)',
           padding: 'var(--space-4) var(--space-6)',
@@ -160,16 +173,16 @@ export function AttendancePage() {
       ) : records.length === 0 ? (
         <div className="card" style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-tertiary)' }}>
           <Calendar size={36} style={{ marginBottom: 'var(--space-3)', opacity: 0.5 }} />
-          <p>No attendance entries found for {selectedDate}. Select a date or mark initial attendance.</p>
+          <p>{isStudent ? `No attendance entries recorded for you on ${selectedDate}.` : `No attendance entries found for ${selectedDate}. Select a date or mark initial attendance.`}</p>
         </div>
       ) : (
         <div className="card" style={{ overflowX: 'auto' }}>
           <table className="table">
             <thead>
               <tr>
-                <th>Student</th>
+                <th>{isStudent ? 'Course / Roster' : 'Student'}</th>
                 <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Quick Actions</th>
+                {!isStudent && <th style={{ textAlign: 'right' }}>Quick Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -191,20 +204,22 @@ export function AttendancePage() {
                         {r.status.toUpperCase()}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: 'var(--space-1)' }}>
-                        {(['present', 'late', 'absent', 'excused'] as const).map((s) => (
-                          <button
-                            key={s}
-                            className={`btn btn-sm ${r.status === s ? 'btn-primary' : 'btn-ghost'}`}
-                            onClick={() => handleStatusChange(r.id, s)}
-                            style={{ fontSize: '0.75rem', textTransform: 'capitalize' }}
-                          >
-                            {s}
-                          </button>
-                        ))}
-                      </div>
-                    </td>
+                    {!isStudent && (
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: 'var(--space-1)' }}>
+                          {(['present', 'late', 'absent', 'excused'] as const).map((s) => (
+                            <button
+                              key={s}
+                              className={`btn btn-sm ${r.status === s ? 'btn-primary' : 'btn-ghost'}`}
+                              onClick={() => handleStatusChange(r.id, s)}
+                              style={{ fontSize: '0.75rem', textTransform: 'capitalize' }}
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}

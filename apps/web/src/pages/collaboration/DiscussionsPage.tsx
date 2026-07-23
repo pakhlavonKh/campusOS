@@ -1,8 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { MessageSquare, Plus, Search, Pin, ThumbsUp, X, Send } from 'lucide-react';
 import { collaborationService, Thread } from '../../api/services/collaboration.service';
+import { useAuthStore } from '../../store/auth.store';
 
 export function DiscussionsPage() {
+  const user = useAuthStore((state: any) => state.user);
+  const userRole = (user?.role || user?.roles?.[0] || 'student').toLowerCase();
+
+  if (userRole === 'student' || userRole === 'parent') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   const [threads, setThreads] = useState<Thread[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);

@@ -1,13 +1,13 @@
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { Card } from '../../components/Card';
-import { LogOut, User, Bell, Palette, GraduationCap, School, Shield, UserCheck, Heart, Globe } from 'lucide-react-native';
+import { LogOut, User, Bell, Palette, Globe } from 'lucide-react-native';
 import { useThemeStore } from '../../store/theme.store';
-import { useAuthStore, UserRole } from '../../store/auth.store';
+import { useAuthStore } from '../../store/auth.store';
 import { useLanguageStore, Language } from '../../store/language.store';
 
 export default function SettingsScreen() {
   const { primaryColor, setTheme } = useThemeStore();
-  const { user, role, setRole } = useAuthStore();
+  const { user, signOut } = useAuthStore();
   const { language, setLanguage, t } = useLanguageStore();
 
   const toggleTheme = () => {
@@ -38,17 +38,18 @@ export default function SettingsScreen() {
     Alert.alert(
       t('signOut'),
       t('signOutAlertMsg'),
-      [{ text: 'OK' }]
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: t('signOut'),
+          style: 'destructive',
+          onPress: () => {
+            signOut();
+          },
+        },
+      ]
     );
   };
-
-  const rolesConfig: { id: UserRole; labelKey: string; icon: any }[] = [
-    { id: 'admin', labelKey: 'adminMode', icon: Shield },
-    { id: 'teacher', labelKey: 'teacherMode', icon: School },
-    { id: 'assistant_teacher', labelKey: 'assistantTeacherMode', icon: UserCheck },
-    { id: 'student', labelKey: 'studentMode', icon: GraduationCap },
-    { id: 'parent', labelKey: 'parentMode', icon: Heart },
-  ];
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -62,40 +63,6 @@ export default function SettingsScreen() {
       </View>
 
       <Card style={styles.menuCard}>
-        {/* Role Switcher supporting all 5 roles */}
-        <View style={styles.roleBox}>
-          <Text style={styles.roleLabel}>{t('activeRole')}</Text>
-          <View style={styles.roleGrid}>
-            {rolesConfig.map((r) => {
-              const Icon = r.icon;
-              const isActive = role === r.id;
-              return (
-                <TouchableOpacity
-                  key={r.id}
-                  style={[
-                    styles.roleBtn,
-                    isActive && { backgroundColor: primaryColor, borderColor: primaryColor },
-                  ]}
-                  onPress={() => setRole(r.id)}
-                  activeOpacity={0.7}
-                >
-                  <Icon size={14} color={isActive ? '#ffffff' : '#64748b'} />
-                  <Text
-                    style={[
-                      styles.roleBtnText,
-                      isActive && { color: '#ffffff', fontWeight: '700' },
-                    ]}
-                  >
-                    {t(r.labelKey)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={styles.divider} />
-
         {/* Language Selector */}
         <View style={styles.languageBox}>
           <View style={styles.languageLabelRow}>

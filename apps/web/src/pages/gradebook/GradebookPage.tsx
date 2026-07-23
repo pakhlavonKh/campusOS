@@ -3,6 +3,7 @@ import { Search, Settings, Plus, FileText, FileCode, X, ClipboardList, UploadClo
 import { coursesService, Course } from '../../api/services/courses.service';
 import { GradeEntry } from '../../api/services/gradebook.service';
 import { storageService } from '../../api/services/storage.service';
+import { useAuthStore } from '../../store/auth.store';
 
 interface ContextFile {
   id: string;
@@ -33,6 +34,10 @@ interface Student {
 }
 
 export function GradebookPage() {
+  const user = useAuthStore((state: any) => state.user);
+  const userRole = (user?.role || user?.roles?.[0] || 'student').toLowerCase();
+  const isStudent = userRole === 'student';
+
   const [activeTab, setActiveTab] = useState<'assignments' | 'gradebook'>('assignments');
   const [assignments, setAssignments] = useState<WebAssignment[]>([]);
   const [students] = useState<Student[]>([]);
@@ -98,54 +103,57 @@ export function GradebookPage() {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      let fileUrl: string | undefined;
-
       try {
-        const uploadRes = await storageService.uploadFile(file);
-        if (uploadRes.success && uploadRes.data?.url) {
-          fileUrl = uploadRes.data.url;
+        const uploadRes = await storageService.uploadFile(file, 'course-content');
+        if (uploadRes.success && uploadRes.data) {
+          newAttachments.push({
+            id: uploadRes.data.id,
+            name: uploadRes.data.originalName,
+            size: formatFileSize(uploadRes.data.sizeBytes),
+            type: determineFileType(uploadRes.data.originalName),
+            url: uploadRes.data.publicUrl,
+          });
         }
       } catch (err) {
-        console.warn('Direct backend upload fallback (using browser file metadata).', err);
+        console.warn('Upload error during assignment file attach:', err);
+        newAttachments.push({
+          id: `f_${Date.now()}_${i}`,
+          name: file.name,
+          size: formatFileSize(file.size),
+          type: determineFileType(file.name),
+        });
       }
-
-      newAttachments.push({
-        id: `file_${Date.now()}_${i}`,
-        name: file.name,
-        size: formatFileSize(file.size),
-        type: determineFileType(file.name),
-        url: fileUrl,
-      });
     }
 
-    setAttachedFiles((prev: ContextFile[]) => [...prev, ...newAttachments]);
+    setAttachedFiles((prev) => [...prev, ...newAttachments]);
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleRemoveContextFile = (fileId: string) => {
-    setAttachedFiles(attachedFiles.filter((f: ContextFile) => f.id !== fileId));
+  const handleRemoveFile = (id: string) => {
+    setAttachedFiles((prev) => prev.filter((f) => f.id !== id));
   };
 
   const handleCreateAssignment = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isStudent) return;
     if (!newTitle.trim()) return;
 
-    const newAssn: WebAssignment = {
-      id: `a_${Date.now()}`,
+    const created: WebAssignment = {
+      id: `assign_${Date.now()}`,
       title: newTitle,
-      course: newCourse || 'CS301 Data Structures',
+      course: newCourse || (courses[0]?.title || 'General Course'),
       category: 'Homework',
-      dueDate: 'In 7 days, 11:59 PM',
+      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       totalSubmissions: 0,
       gradedSubmissions: 0,
       maxScore: parseInt(newMaxScore, 10) || 100,
-      instructions: newInstructions || 'Follow attached context reference materials.',
+      instructions: newInstructions,
       rubric: newRubric,
       contextFiles: attachedFiles,
     };
 
-    setAssignments([newAssn, ...assignments]);
+    setAssignments((prev) => [created, ...prev]);
     setNewTitle('');
     setNewInstructions('');
     setAttachedFiles([]);
@@ -185,14 +193,16 @@ export function GradebookPage() {
     <div className="animate-fade-in">
       <div className="page-header" style={{ marginBottom: 'var(--space-4)' }}>
         <div className="page-header-left">
-          <h1>Assignments & Gradebook</h1>
-          <p>Microsoft Teams-style Assignment Creation with Context Reference Files</p>
+          <h1>{isStudent ? 'My Assignments & Grades' : 'Assignments & Gradebook'}</h1>
+          <p>{isStudent ? 'View your course assignments, reference materials, and scores' : 'Microsoft Teams-style Assignment Creation with Context Reference Files'}</p>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-          <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-            <Plus size={16} /> Create Assignment
-          </button>
-        </div>
+        {!isStudent && (
+          <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+            <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
+              <Plus size={16} /> Create Assignment
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -213,27 +223,29 @@ export function GradebookPage() {
             gap: '8px',
           }}
         >
-          <ClipboardList size={18} /> Teams Assignments
+          <ClipboardList size={18} /> {isStudent ? 'Course Assignments' : 'Teams Assignments'}
         </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab('gradebook')}
-          style={{
-            padding: 'var(--space-3) var(--space-4)',
-            border: 'none',
-            background: 'none',
-            borderBottom: activeTab === 'gradebook' ? '2px solid var(--color-primary-500)' : '2px solid transparent',
-            color: activeTab === 'gradebook' ? 'var(--color-primary-500)' : 'var(--text-secondary)',
-            fontWeight: activeTab === 'gradebook' ? 600 : 500,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <Settings size={18} /> Gradebook Matrix
-        </button>
+        {!isStudent && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('gradebook')}
+            style={{
+              padding: 'var(--space-3) var(--space-4)',
+              border: 'none',
+              background: 'none',
+              borderBottom: activeTab === 'gradebook' ? '2px solid var(--color-primary-500)' : '2px solid transparent',
+              color: activeTab === 'gradebook' ? 'var(--color-primary-500)' : 'var(--text-secondary)',
+              fontWeight: activeTab === 'gradebook' ? 600 : 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <Settings size={18} /> Gradebook Matrix
+          </button>
+        )}
       </div>
 
       {/* Search */}

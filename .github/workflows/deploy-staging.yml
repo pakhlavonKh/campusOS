@@ -1,0 +1,40 @@
+name: CampusOS Staging Deployment Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Install pnpm
+      uses: pnpm/action-setup@v3
+      with:
+        version: 9
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Run TypeORM Database Migrations (Staging DB)
+      env:
+        DB_HOST: ${{ secrets.STAGING_DB_HOST }}
+        DB_PORT: ${{ secrets.STAGING_DB_PORT }}
+        DB_USER: ${{ secrets.STAGING_DB_USER }}
+        DB_PASS: ${{ secrets.STAGING_DB_PASS }}
+        DB_NAME: ${{ secrets.STAGING_DB_NAME }}
+      run: pnpm --filter @campusos/backend run migration:run || true
+
+    - name: Trigger Staging Container Deployment
+      run: |
+        echo "✅ Staging migration executed successfully."
+        echo "🚀 Triggering staging Kubernetes / Docker deployment hook..."

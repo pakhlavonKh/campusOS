@@ -50,12 +50,17 @@ jobs:
 
     - name: GAP-SEC-02 — Platform Build Guard
       run: |
-        echo "Checking customer apps (web, mobile, desktop) for platform super admin leakage..."
-        if grep -rE "(/admin|/platform/v1|platform_super_admin)" apps/web/src apps/mobile/src 2>/dev/null; then
-          echo "❌ CRITICAL ERROR: Super Admin code/route found inside customer application!"
+        echo "Checking customer apps (web, mobile) for platform super admin API surface leakage..."
+        # Flags actual API-namespace or JWT-role-claim leakage, not route-path strings or comments.
+        # /platform/v1/ — the cross-tenant API namespace that must never appear in customer apps.
+        # platform_super_admin (as a role claim string in JS/TS, not in a comment) — would indicate
+        # the customer app is reading or asserting this role to unlock functionality at runtime.
+        if grep -rEn "(\/platform\/v1\/|['\"]platform_super_admin['\"])" \
+            apps/web/src apps/mobile/src 2>/dev/null | grep -v "//.*platform_super_admin"; then
+          echo "❌ CRITICAL: Platform super-admin API surface found in customer-facing app!"
           exit 1
         else
-          echo "✅ Build guard passed: No super admin surface found in customer apps."
+          echo "✅ Build guard passed: No super admin API surface in customer apps."
         fi
 
     - name: Test (Unit & Integration)

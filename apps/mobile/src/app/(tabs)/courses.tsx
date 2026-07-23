@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
 import { useThemeStore } from '../../store/theme.store';
 import { useLanguageStore } from '../../store/language.store';
+import { apiFetch } from '../../api/client';
 
 interface Course {
   id: string;
@@ -17,7 +18,36 @@ interface Course {
 export default function CoursesScreen() {
   const primaryColor = useThemeStore((state: any) => state.primaryColor);
   const t = useLanguageStore((state: any) => state.t);
-  const [courses] = useState<Course[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    async function loadBackendCourses() {
+      setLoading(true);
+      try {
+        const res = await apiFetch('/courses');
+        if (res.success && Array.isArray(res.data)) {
+          const mappedCourses: Course[] = res.data.map((c: any) => ({
+            id: c.id,
+            title: c.title,
+            subject: c.subject || 'Curriculum',
+            instructor: c.instructor || 'Faculty Instructor',
+            status: c.status === 'published' ? 'published' : 'draft',
+            progress: c.progress || 0,
+          }));
+          setCourses(mappedCourses);
+        } else {
+          setCourses([]);
+        }
+      } catch (err) {
+        console.warn('[Mobile Courses] Failed to load backend courses:', err);
+        setCourses([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadBackendCourses();
+  }, []);
 
   const handleCoursePress = (course: Course) => {
     Alert.alert(
@@ -59,7 +89,12 @@ export default function CoursesScreen() {
 
   return (
     <View style={styles.container}>
-      {courses.length === 0 ? (
+      {loading ? (
+        <View style={styles.emptyStateContainer}>
+          <ActivityIndicator size="large" color={primaryColor} />
+          <Text style={[styles.emptyStateText, { marginTop: 12 }]}>Loading live courses from backend...</Text>
+        </View>
+      ) : courses.length === 0 ? (
         <View style={styles.emptyStateContainer}>
           <Text style={styles.emptyStateText}>No active course enrollments found.</Text>
         </View>

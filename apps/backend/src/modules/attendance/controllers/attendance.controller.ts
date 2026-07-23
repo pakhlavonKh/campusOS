@@ -7,6 +7,7 @@ import {
   Query,
   UseGuards,
   ParseUUIDPipe,
+  ForbiddenException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -80,10 +81,19 @@ export class AttendanceController {
   @ApiOperation({ summary: "Get student's attendance history" })
   async getStudentHistory(
     @TenantId() tenantId: string,
+    @CurrentUser() user: any,
     @Param('studentId', ParseUUIDPipe) studentId: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
+    const roles: string[] = user?.roles || [];
+    const adminOrTeacherRoles = ['admin', 'super_admin', 'org_admin', 'branch_admin', 'teacher', 'instructor'];
+    const isStudentOnly = roles.some((r) => r.toLowerCase() === 'student') && !roles.some((r) => adminOrTeacherRoles.includes(r.toLowerCase()));
+
+    if (isStudentOnly && user?.sub && studentId !== user.sub) {
+      throw new ForbiddenException('Students can only view their own attendance history');
+    }
+
     const history = await this.attendanceService.getStudentAttendance(
       tenantId,
       studentId,
@@ -151,8 +161,12 @@ export class AttendanceController {
   @Get('stats')
   @Permissions('attendance:read')
   @ApiOperation({ summary: 'Get daily attendance statistics summary' })
-  async getDailyStats(@TenantId() tenantId: string, @Query('date') date: string) {
-    const stats = await this.attendanceService.getDailyStats(tenantId, date);
+  async getDailyStats(
+    @TenantId() tenantId: string,
+    @Query('date') date: string,
+    @CurrentUser() user: any,
+  ) {
+    const stats = await this.attendanceService.getDailyStats(tenantId, date, user);
     return {
       success: true,
       data: stats,

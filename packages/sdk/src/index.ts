@@ -3,7 +3,7 @@ import { CampusOsClient, SdkConfig } from './client.js';
 export * from './client.js';
 
 /**
- * CampusOS SDK Instance providing typed resources.
+ * CampusOS SDK Instance providing typed resources across all domain contexts.
  * GAP-PKG-02: SRS §20.7, SDD §24.8
  */
 export class CampusOsSdk {
@@ -13,10 +13,10 @@ export class CampusOsSdk {
     this.client = new CampusOsClient(config);
   }
 
-  // Auth endpoints
+  // Auth & Session endpoints
   auth = {
     login: (credentials: { email: string; password: string }) =>
-      this.client.request<{ data: { accessToken: string; refreshToken: string; challengeToken?: string } }>(
+      this.client.request<{ data: { accessToken: string; refreshToken: string; user: any; organizationId: string; memberships?: any[] } }>(
         '/api/v1/auth/login',
         { method: 'POST', body: JSON.stringify(credentials) },
       ),
@@ -25,25 +25,15 @@ export class CampusOsSdk {
         '/api/v1/auth/mfa/verify',
         { method: 'POST', body: JSON.stringify(data) },
       ),
-    setupMfa: () =>
-      this.client.request<{ data: { provisioningUri: string; qrCode: string; backupCodes: string[] } }>(
-        '/api/v1/auth/mfa/setup',
-        { method: 'POST' },
-      ),
-    confirmMfa: (code: string) =>
-      this.client.request<{ data: { enabled: boolean } }>(
-        '/api/v1/auth/mfa/setup/confirm',
-        { method: 'POST', body: JSON.stringify({ code }) },
+    switchContext: (membershipId: string) =>
+      this.client.request<{ data: { accessToken: string; activeMembership: any } }>(
+        '/api/v1/auth/context/switch',
+        { method: 'POST', body: JSON.stringify({ membershipId }) },
       ),
     forgotPassword: (email: string) =>
       this.client.request<{ data: { message: string } }>(
         '/api/v1/auth/forgot-password',
         { method: 'POST', body: JSON.stringify({ email }) },
-      ),
-    resetPassword: (data: { resetToken: string; newPassword: string }) =>
-      this.client.request<{ data: { message: string } }>(
-        '/api/v1/auth/reset-password',
-        { method: 'POST', body: JSON.stringify(data) },
       ),
   };
 
@@ -59,22 +49,41 @@ export class CampusOsSdk {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    enroll: (courseId: string) =>
-      this.client.request<{ data: any }>(`/api/v1/courses/${courseId}/enroll`, { method: 'POST' }),
-    markLessonComplete: (courseId: string, lessonId: string) =>
-      this.client.request<{ data: any }>(`/api/v1/courses/${courseId}/lessons/${lessonId}/complete`, {
-        method: 'POST',
-      }),
-    getProgress: (courseId: string) =>
-      this.client.request<{ data: any }>(`/api/v1/courses/${courseId}/progress`),
   };
 
-  // Platform Admin (admin-desktop only)
-  platform = {
-    login: (credentials: { email: string; password: string }) =>
-      this.client.request<{ data: { accessToken: string; refreshToken: string } }>(
-        '/platform/v1/auth/login',
-        { method: 'POST', body: JSON.stringify(credentials) },
-      ),
+  // Attendance endpoints
+  attendance = {
+    getStats: (date: string) =>
+      this.client.request<{ data: { date: string; records: any[] } }>(`/api/v1/attendance/stats?date=${date}`),
+    record: (payload: { studentId: string; date: string; status: string }) =>
+      this.client.request<{ data: any }>('/api/v1/attendance', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+  };
+
+  // Messaging endpoints
+  messaging = {
+    listConversations: () => this.client.request<{ data: any[] }>('/api/v1/messaging/conversations'),
+    getMessages: (conversationId: string) =>
+      this.client.request<{ data: any[] }>(`/api/v1/messaging/conversations/${conversationId}/messages`),
+    sendMessage: (conversationId: string, content: string) =>
+      this.client.request<{ data: any }>(`/api/v1/messaging/conversations/${conversationId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      }),
+  };
+
+  // Users & Memberships endpoints
+  users = {
+    getMyMemberships: () => this.client.request<{ data: any[] }>('/api/v1/users/me/memberships'),
+    getProfile: () => this.client.request<{ data: any }>('/api/v1/users/me'),
+  };
+
+  // Organizations endpoints
+  organizations = {
+    list: () => this.client.request<{ data: any[] }>('/api/v1/organizations'),
+    getPublicWhiteLabel: (slug: string) =>
+      this.client.request<{ data: any }>(`/api/v1/organizations/${slug}/white-label/public`),
   };
 }
