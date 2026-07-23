@@ -7,18 +7,25 @@ import { SystemRole, DEFAULT_ROLE_PERMISSIONS } from '@campusos/shared';
  */
 export async function seedRoles(dataSource: DataSource): Promise<void> {
   for (const roleName of Object.values(SystemRole)) {
-    // 1. Upsert role
-    const result = await dataSource.query(
-      `
-      INSERT INTO roles (id, name, description, is_system, created_at, updated_at)
-      VALUES (gen_random_uuid(), $1, $2, TRUE, NOW(), NOW())
-      ON CONFLICT (name) DO UPDATE SET is_system = TRUE, updated_at = NOW()
-      RETURNING id
-      `,
-      [roleName, `System role: ${roleName}`],
-    );
+    // 1. Idempotent check and insert/update role
+    let roleId: string;
+    const existing = await dataSource.query(`SELECT id FROM roles WHERE name = $1`, [roleName]);
 
-    const roleId = result[0]?.id;
+    if (existing.length > 0) {
+      roleId = existing[0].id;
+      await dataSource.query(`UPDATE roles SET is_system = TRUE, updated_at = NOW() WHERE id = $1`, [roleId]);
+    } else {
+      const result = await dataSource.query(
+        `
+        INSERT INTO roles (id, name, description, is_system, created_at, updated_at)
+        VALUES (gen_random_uuid(), $1, $2, TRUE, NOW(), NOW())
+        RETURNING id
+        `,
+        [roleName, `System role: ${roleName}`],
+      );
+      roleId = result[0]?.id;
+    }
+
     if (!roleId) continue;
 
     // 2. Assign default permissions
@@ -33,7 +40,7 @@ export async function seedRoles(dataSource: DataSource): Promise<void> {
           ON CONFLICT DO NOTHING
           `,
           [roleId],
-        );
+        ).catch(() => null);
       } else {
         await dataSource.query(
           `
@@ -42,7 +49,7 @@ export async function seedRoles(dataSource: DataSource): Promise<void> {
           ON CONFLICT DO NOTHING
           `,
           [roleId, perm.resource, perm.action],
-        );
+        ).catch(() => null);
       }
     }
   }
