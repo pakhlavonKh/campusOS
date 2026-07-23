@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   BookOpen,
@@ -7,7 +7,6 @@ import {
   Bell,
   Settings,
   Users,
-  BarChart3,
   Search,
   LogOut,
   GraduationCap,
@@ -42,18 +41,23 @@ const navItems = [
     section: 'system',
     links: [
       { to: '/users', label: 'Users', key: 'users', icon: Users },
-      { to: '/analytics', label: 'Analytics', key: 'analytics', icon: BarChart3 },
       { to: '/settings', label: 'Settings', key: 'settings', icon: Settings },
     ],
   },
 ];
 
-
 export function DashboardLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const logout = useAuthStore((state: any) => state.logout);
   const whiteLabelConfig = useAuthStore((state: any) => state.whiteLabelConfig);
   const layoutVariant = whiteLabelConfig?.layoutVariant || 'sidebar';
   const { t } = useTranslation();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   const getPageTitle = () => {
     const path = location.pathname.split('/')[1];
@@ -65,7 +69,6 @@ export function DashboardLayout() {
       gradebook: t('gradebook'),
       discussions: t('discussions'),
       users: t('users'),
-      analytics: t('analytics'),
       settings: t('settings'),
       admin: t('globalDashboard'),
     };
@@ -133,7 +136,12 @@ export function DashboardLayout() {
               <Bell size={20} />
             </button>
             <div className="avatar">A</div>
-            <button className="btn btn-ghost btn-icon" title={t('logout')} style={{ marginLeft: 'var(--space-2)' }}>
+            <button
+              className="btn btn-ghost btn-icon"
+              title={t('logout')}
+              onClick={handleLogout}
+              style={{ marginLeft: 'var(--space-2)' }}
+            >
               <LogOut size={16} />
             </button>
           </div>
@@ -220,7 +228,7 @@ export function DashboardLayout() {
                 admin@campus.edu
               </div>
             </div>
-            <button className="btn btn-ghost btn-icon" title={t('logout')}>
+            <button className="btn btn-ghost btn-icon" title={t('logout')} onClick={handleLogout}>
               <LogOut size={16} />
             </button>
           </div>

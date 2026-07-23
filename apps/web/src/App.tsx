@@ -9,6 +9,8 @@ import { AttendancePage } from './pages/attendance/AttendancePage';
 import { MessagingPage } from './pages/messaging/MessagingPage';
 import { GradebookPage } from './pages/gradebook/GradebookPage';
 import { DiscussionsPage } from './pages/collaboration/DiscussionsPage';
+import { SettingsPage } from './pages/settings/SettingsPage';
+import { UsersPage } from './pages/users/UsersPage';
 import { useDesktop } from './hooks/useDesktop';
 
 // Theme Switcher for testing Tiers 1 & 2 of the Whitelabeling Architecture
@@ -92,7 +94,7 @@ function App() {
       {/* Auth */}
       <Route path="/login" element={<LoginPage />} />
 
-      {/* Dashboard */}
+      {/* Dashboard & App Pages */}
       <Route element={<DashboardLayout />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/courses" element={<CoursesPage />} />
@@ -100,6 +102,8 @@ function App() {
         <Route path="/messaging" element={<MessagingPage />} />
         <Route path="/gradebook" element={<GradebookPage />} />
         <Route path="/discussions" element={<DiscussionsPage />} />
+        <Route path="/users" element={<UsersPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Route>
 
       {/* Default redirect */}
@@ -110,4 +114,3 @@ function App() {
 }
 
 export default App;
-

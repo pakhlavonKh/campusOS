@@ -1,7 +1,9 @@
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { Card } from '../../components/Card';
 import { Badge } from '../../components/Badge';
 import { useThemeStore } from '../../store/theme.store';
+import { useLanguageStore } from '../../store/language.store';
 
 interface Course {
   id: string;
@@ -12,49 +14,64 @@ interface Course {
   progress: number;
 }
 
-const mockCourses: Course[] = [
-  { id: '1', title: 'Advanced Physics: Quantum Mechanics', subject: 'Physics', status: 'published', instructor: 'Dr. Sarah Chen', progress: 67 },
-  { id: '2', title: 'Organic Chemistry Fundamentals', subject: 'Chemistry', status: 'published', instructor: 'Prof. James Wilson', progress: 45 },
-  { id: '3', title: 'Data Structures & Algorithms', subject: 'Computer Science', status: 'published', instructor: 'Dr. Maya Patel', progress: 82 },
-];
-
 export default function CoursesScreen() {
-  const primaryColor = useThemeStore((state) => state.primaryColor);
+  const primaryColor = useThemeStore((state: any) => state.primaryColor);
+  const t = useLanguageStore((state: any) => state.t);
+  const [courses] = useState<Course[]>([]);
+
+  const handleCoursePress = (course: Course) => {
+    Alert.alert(
+      course.title,
+      `${t('courseDetails')}:\nSubject: ${course.subject}\nInstructor: ${course.instructor}\nProgress: ${course.progress}%`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: t('viewLessons'), onPress: () => Alert.alert('Syllabus Loaded', `Opening curriculum modules for ${course.subject}`) },
+      ]
+    );
+  };
 
   const renderItem = ({ item }: { item: Course }) => (
-    <Card style={styles.courseCard}>
-      <View style={styles.cardHeader}>
-        <Text style={[styles.subject, { color: primaryColor }]}>{item.subject}</Text>
-        <Badge 
-          label={item.status} 
-          variant={item.status === 'published' ? 'success' : 'neutral'} 
-        />
-      </View>
-      
-      <Text style={styles.title}>{item.title}</Text>
-      <Text style={styles.instructor}>{item.instructor}</Text>
+    <TouchableOpacity onPress={() => handleCoursePress(item)} activeOpacity={0.7}>
+      <Card style={styles.courseCard}>
+        <View style={styles.cardHeader}>
+          <Text style={[styles.subject, { color: primaryColor }]}>{item.subject}</Text>
+          <Badge 
+            label={item.status} 
+            variant={item.status === 'published' ? 'success' : 'neutral'} 
+          />
+        </View>
+        
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.instructor}>{item.instructor}</Text>
 
-      <View style={styles.progressContainer}>
-        <View style={styles.progressHeader}>
-          <Text style={styles.progressLabel}>Progress</Text>
-          <Text style={styles.progressValue}>{item.progress}%</Text>
+        <View style={styles.progressContainer}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressLabel}>{t('completed')}</Text>
+            <Text style={styles.progressValue}>{item.progress}%</Text>
+          </View>
+          <View style={styles.progressBarBg}>
+            <View style={[styles.progressBarFill, { width: `${item.progress}%`, backgroundColor: primaryColor }]} />
+          </View>
         </View>
-        <View style={styles.progressBarBg}>
-          <View style={[styles.progressBarFill, { width: `${item.progress}%`, backgroundColor: primaryColor }]} />
-        </View>
-      </View>
-    </Card>
+      </Card>
+    </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={mockCourses}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {courses.length === 0 ? (
+        <View style={styles.emptyStateContainer}>
+          <Text style={styles.emptyStateText}>No active course enrollments found.</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={courses}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </View>
   );
 }
@@ -67,6 +84,17 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 20,
     paddingTop: 24,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#94a3b8',
+    textAlign: 'center',
   },
   courseCard: {
     padding: 20,

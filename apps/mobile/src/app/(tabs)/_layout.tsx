@@ -2,10 +2,12 @@ import { Tabs } from 'expo-router';
 import { LayoutDashboard, BookOpen, ClipboardList, Settings } from 'lucide-react-native';
 import { useThemeStore } from '../../store/theme.store';
 import { useAuthStore } from '../../store/auth.store';
+import { useLanguageStore } from '../../store/language.store';
 
 export default function TabLayout() {
   const primaryColor = useThemeStore((state: any) => state.primaryColor);
   const role = useAuthStore((state: any) => state.role);
+  const t = useLanguageStore((state: any) => state.t);
 
   return (
     <Tabs
@@ -34,7 +36,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
+          title: t('dashboard'),
           headerShown: false,
           tabBarIcon: ({ color }) => <LayoutDashboard size={24} color={color} />,
         }}
@@ -43,7 +45,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="grading"
         options={{
-          title: role === 'teacher' ? 'Assign & Grade' : 'Assignments',
+          title: role === 'teacher' ? t('grading') : t('assignments'),
           headerShown: false,
           tabBarIcon: ({ color }) => <ClipboardList size={24} color={color} />,
         }}
@@ -52,7 +54,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="courses"
         options={{
-          title: 'Courses',
+          title: t('courses'),
           tabBarIcon: ({ color }) => <BookOpen size={24} color={color} />,
         }}
       />
@@ -60,7 +62,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
+          title: t('settings'),
           tabBarIcon: ({ color }) => <Settings size={24} color={color} />,
         }}
       />

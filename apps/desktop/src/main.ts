@@ -187,6 +187,29 @@ ipcMain.handle('app:version', () => {
   return app.getVersion();
 });
 
+ipcMain.handle('auth:verify-token-role', (_event: any, token: string): { valid: boolean; error?: string } => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = Buffer.from(base64, 'base64').toString();
+    const payload = JSON.parse(jsonPayload);
+
+    const roles: string[] = payload.roles || [];
+    const allowedDesktopRoles = ['platform_super_admin', 'org_admin', 'branch_admin', 'admin', 'teacher', 'assistant_teacher'];
+    const hasAllowedRole = roles.some((r) => allowedDesktopRoles.includes(r));
+
+    if (!hasAllowedRole) {
+      return {
+        valid: false,
+        error: 'Access Denied: Desktop application is restricted to Admin, Teacher, and Assistant Teacher accounts only.',
+      };
+    }
+    return { valid: true };
+  } catch (err) {
+    return { valid: false, error: 'Invalid Token' };
+  }
+});
+
 ipcMain.on('app:retry', () => {
   console.log('Retry connection request received, reloading app...');
   loadApp();

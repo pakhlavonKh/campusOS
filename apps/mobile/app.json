@@ -14,10 +14,11 @@
       "bundleIdentifier": "com.campusos.mobile"
     },
     "android": {
-      "package": "com.campusos.mobile"
+      "package": "com.campusos.mobile",
+      "permissions": ["DETECT_SCREEN_CAPTURE"]
     },
     "plugins": [
-      "expo-router"
+      ["expo-router", { "root": "src/app" }]
     ],
     "experiments": {
       "typedRoutes": true

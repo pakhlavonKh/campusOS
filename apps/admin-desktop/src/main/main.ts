@@ -146,9 +146,15 @@ ipcMain.handle('auth:verify-token-role', (_event: any, token: string): { valid: 
     const jsonPayload = Buffer.from(base64, 'base64').toString();
     const payload = JSON.parse(jsonPayload);
 
-    const roles = payload.roles || [];
-    if (!roles.includes('platform_super_admin')) {
-      return { valid: false, error: 'Forbidden: Access restricted to Platform Super Admins only.' };
+    const roles: string[] = payload.roles || [];
+    const allowedDesktopRoles = ['platform_super_admin', 'org_admin', 'branch_admin', 'admin', 'teacher', 'assistant_teacher'];
+    const hasAllowedRole = roles.some((r) => allowedDesktopRoles.includes(r));
+
+    if (!hasAllowedRole) {
+      return {
+        valid: false,
+        error: 'Forbidden: Desktop client is restricted to Admin, Teacher, and Assistant Teacher accounts only.',
+      };
     }
 
     return { valid: true };

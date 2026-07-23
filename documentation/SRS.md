@@ -54,6 +54,7 @@
    - 5.27 Student and Parent Web Portal
    - 5.28 Platform Super Admin Desktop Application
    - 5.29 Per-Organization App Provisioning and Maintenance
+   - 5.30 Unified Login with Role-Based Rendering
 6. Non-Functional Requirements
 7. Business Rules
 8. Domain Model
@@ -947,6 +948,16 @@ Support a repeatable internal workflow for provisioning a Tier 3 dedicated front
 - Each provisioned organization application is tracked in an internal registry (organization, app version/package versions in use, deployment URL, last update date) so the platform team can see at a glance which organization apps exist and how current they are.
 - Define and enforce a maximum allowable drift between an organization app's shared-package versions (`packages/ui`, `packages/sdk`, `packages/shared`) and the latest published versions, especially for security patches; organization apps exceeding the allowed drift must be flagged for update.
 - Removing or offboarding an organization's dedicated app must not affect any other organization's app or the shared backend.
+
+### 5.30 Unified Login with Role-Based Rendering
+
+For every customer-facing application (`apps/web`, `apps/mobile`, `apps/desktop`, the student/parent web portal, and any Tier 3 dedicated organization app per 5.26) — explicitly **excluding** the Platform Super Admin desktop app (5.28), which remains single-role and isolated — implement a single login per application that resolves into a role-appropriate experience after authentication, rather than separate logins or separate apps per role. This follows the pattern used by products like Microsoft Teams (one login, workspace/org context resolved after sign-in) and Moodle (one login, dashboard and available actions determined by role within each course).
+
+- After authentication, the application resolves the user's Membership(s) — the set of (organization, branch, role) combinations the account holds — and renders the dashboard, navigation, and available actions for the relevant role automatically. A Teacher sees teaching workflows; a Student sees learning workflows; a Branch Admin sees branch-management workflows; and so on, all from the same login screen and the same application build.
+- If a user holds exactly one Membership, they land directly in that role's experience with no extra step.
+- If a user holds multiple Memberships (e.g., a Teacher at one branch who is also a Parent of a student at another branch, or a Branch Admin for two branches), provide an in-app context switcher to move between them without a full re-login — consistent with how Teams switches between organizations or Slack switches workspaces. The most recently used context is remembered as the default on next login.
+- Switching context must immediately re-scope the user's available data, navigation, and permissions to the newly selected Membership; no data or actions from a previous context should remain visible after switching.
+- This requirement applies uniformly across web, mobile, desktop, and Tier 3 organization apps so that role-based behavior is consistent regardless of which client the user is on.
 
 ---
 

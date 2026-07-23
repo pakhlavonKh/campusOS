@@ -3287,24 +3287,39 @@ sequenceDiagram
     API->>API: Generate new access token
     API->>DB: Rotate refresh token (invalidate old, create new)
     API-->>Client: {accessToken, refreshToken, expiresIn}
+
+    Note over Client,DB: Context Switch (multi-Membership users — SRS 5.30)
+    Client->>API: POST /auth/switch-context {membershipId}
+    API->>DB: Verify membershipId belongs to authenticated user (sub) and is active
+    DB-->>API: Membership record (org, branch, role, permissions)
+    API->>API: Generate new access token scoped to selected Membership (same refresh token, no full re-login)
+    API-->>Client: {accessToken, expiresIn}
 ```
 
 **JWT Payload Structure:**
 
 ```typescript
 interface JwtPayload {
-  sub: string;          // userId (UUID)
-  orgId: string;        // organizationId (UUID)
-  branchId: string;     // active branchId (UUID)
-  roles: string[];      // ['teacher', 'branch_admin']
-  permissions: string[];// ['course:create', 'grade:edit'] — cached subset
-  iat: number;          // issued at
-  exp: number;          // expiry (15 minutes from iat)
-  jti: string;          // JWT ID for blacklisting
-  mfa: boolean;         // MFA completed
-  sessionId: string;    // session identifier
+  sub: string;              // userId (UUID)
+  activeMembershipId: string;// currently selected Membership (UUID) — determines scoping below
+  orgId: string;             // organizationId of the active Membership (UUID)
+  branchId: string;          // branchId of the active Membership (UUID)
+  roles: string[];           // roles for the ACTIVE membership only, e.g. ['teacher']
+  permissions: string[];     // ['course:create', 'grade:edit'] — cached subset, active membership only
+  iat: number;               // issued at
+  exp: number;               // expiry (15 minutes from iat)
+  jti: string;               // JWT ID for blacklisting
+  mfa: boolean;              // MFA completed
+  sessionId: string;         // session identifier
 }
 ```
+
+Per SRS 5.30, a user's access token always reflects exactly **one active Membership** (one org/branch/role context) — never a merged set of all their roles. This keeps authorization checks simple (every request is scoped to a single, unambiguous context) and matches the Teams/Slack-style "switch workspace" pattern rather than trying to encode multiple roles into one token.
+
+- `GET /auth/memberships` returns the full list of Memberships available to the authenticated user (id, organization, branch, role, display label), used to render the context switcher UI and to determine whether a user lands directly in their single context or sees a switcher after login.
+- `POST /auth/switch-context` re-scopes the access token to a different Membership using the existing refresh token/session — no password re-entry, consistent with 5.30's "no full re-login" requirement. The previous access token is blacklisted immediately so no stale, differently-scoped token remains valid.
+- The client (web/mobile/desktop app shell) persists the `activeMembershipId` used last (e.g., in secure local storage) so the next login can default to it directly, per SRS 5.30's "most recently used context remembered" requirement.
+- This flow applies identically across `apps/web`, `apps/mobile`, `apps/desktop`, the student/parent portal, and Tier 3 organization apps. The Platform Super Admin app (`apps/admin-desktop`) does not implement this flow — it has no Membership concept and remains single-role by design (§3.2.3.2).
 
 **Token Configuration:**
 
@@ -3317,6 +3332,7 @@ interface JwtPayload {
 | Token blacklist TTL | Matches access token remaining TTL | Memory-efficient, expired tokens don't need blacklisting |
 
 ## 5.2 Authorization Infrastructure
+
 
 ### RBAC + ABAC Combined Flow
 
@@ -6230,7 +6246,7 @@ campusos/
 │   │   │   ├── app/
 │   │   │   │   ├── routes/
 │   │   │   │   ├── layouts/
-│   │   │   │   └── providers/               # includes ThemeProvider (org token/layout-variant resolution, see SDD 3.2.3.1)
+│   │   │   │   └── providers/               # includes ThemeProvider (org token/layout-variant resolution, SDD 3.2.3.1) and SessionContextProvider (resolves active Membership, exposes context switcher, SDD 5.1/SRS 5.30)
 │   │   │   ├── features/                    # Feature-based organization
 │   │   │   │   ├── auth/
 │   │   │   │   ├── dashboard/
@@ -6368,7 +6384,7 @@ campusos/
 │   ├── ui/                                  # Shared UI component library
 │   │   ├── src/
 │   │   │   ├── primitives/
-│   │   │   ├── composite/
+│   │   │   ├── composite/                   # includes ContextSwitcher (Teams/Slack-style Membership picker, SRS 5.30)
 │   │   │   ├── charts/
 │   │   │   ├── forms/
 │   │   │   └── themes/                      # Design-token theme definitions consumed via CSS custom properties; org-specific tokens injected at runtime by ThemeProvider (SDD 3.2.3.1), not baked in at build time

@@ -167,10 +167,10 @@ const translations: Record<Language, Record<string, string>> = {
 const LanguageContext = createContext<LanguageContextType>({
   language: 'en',
   setLanguage: () => {},
-  t: (key) => key,
+  t: (key: string) => key,
 });
 
-export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }: { children: React.ReactNode }) => {
   const [language, setLanguageState] = useState<Language>(() => {
     const saved = localStorage.getItem('language');
     if (saved === 'en' || saved === 'ru' || saved === 'uz') {
@@ -185,7 +185,10 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const t = (key: string): string => {
-    return translations[language][key] || translations['en'][key] || key;
+    const dicts = translations as Record<string, Record<string, string>>;
+    const currentDict = dicts[language] || {};
+    const fallbackDict = dicts['en'] || {};
+    return currentDict[key] || fallbackDict[key] || key;
   };
 
   return (

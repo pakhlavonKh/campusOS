@@ -1,12 +1,14 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { Card } from '../../components/Card';
-import { LogOut, User, Bell, Shield, Palette, GraduationCap, School } from 'lucide-react-native';
+import { LogOut, User, Bell, Palette, GraduationCap, School, Shield, UserCheck, Heart, Globe } from 'lucide-react-native';
 import { useThemeStore } from '../../store/theme.store';
-import { useAuthStore } from '../../store/auth.store';
+import { useAuthStore, UserRole } from '../../store/auth.store';
+import { useLanguageStore, Language } from '../../store/language.store';
 
 export default function SettingsScreen() {
   const { primaryColor, setTheme } = useThemeStore();
   const { user, role, setRole } = useAuthStore();
+  const { language, setLanguage, t } = useLanguageStore();
 
   const toggleTheme = () => {
     if (primaryColor === '#e11d48') {
@@ -16,8 +18,40 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleProfilePress = () => {
+    Alert.alert(
+      t('personalProfile'),
+      `${t('profileAlertMsg')}\n\nName: ${user.name}\nEmail: ${user.email}\nRole Context: ${user.roleTitle}`,
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleNotificationsPress = () => {
+    Alert.alert(
+      t('notifications'),
+      t('notifAlertMsg'),
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleSignOutPress = () => {
+    Alert.alert(
+      t('signOut'),
+      t('signOutAlertMsg'),
+      [{ text: 'OK' }]
+    );
+  };
+
+  const rolesConfig: { id: UserRole; labelKey: string; icon: any }[] = [
+    { id: 'admin', labelKey: 'adminMode', icon: Shield },
+    { id: 'teacher', labelKey: 'teacherMode', icon: School },
+    { id: 'assistant_teacher', labelKey: 'assistantTeacherMode', icon: UserCheck },
+    { id: 'student', labelKey: 'studentMode', icon: GraduationCap },
+    { id: 'parent', labelKey: 'parentMode', icon: Heart },
+  ];
+
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.profileSection}>
         <View style={[styles.avatarPlaceholder, { backgroundColor: `${primaryColor}20` }]}>
           <Text style={[styles.avatarText, { color: primaryColor }]}>{user.avatarText}</Text>
@@ -28,77 +62,103 @@ export default function SettingsScreen() {
       </View>
 
       <Card style={styles.menuCard}>
-        {/* Role Switcher */}
+        {/* Role Switcher supporting all 5 roles */}
         <View style={styles.roleBox}>
-          <Text style={styles.roleLabel}>Active App Role Context:</Text>
-          <View style={styles.roleButtonsRow}>
-            <TouchableOpacity
-              style={[
-                styles.roleBtn,
-                role === 'teacher' && { backgroundColor: primaryColor },
-              ]}
-              onPress={() => setRole('teacher')}
-            >
-              <School size={16} color={role === 'teacher' ? '#ffffff' : '#64748b'} />
-              <Text
-                style={[
-                  styles.roleBtnText,
-                  role === 'teacher' && { color: '#ffffff', fontWeight: '700' },
-                ]}
-              >
-                Teacher Mode
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.roleBtn,
-                role === 'student' && { backgroundColor: primaryColor },
-              ]}
-              onPress={() => setRole('student')}
-            >
-              <GraduationCap size={16} color={role === 'student' ? '#ffffff' : '#64748b'} />
-              <Text
-                style={[
-                  styles.roleBtnText,
-                  role === 'student' && { color: '#ffffff', fontWeight: '700' },
-                ]}
-              >
-                Student Mode
-              </Text>
-            </TouchableOpacity>
+          <Text style={styles.roleLabel}>{t('activeRole')}</Text>
+          <View style={styles.roleGrid}>
+            {rolesConfig.map((r) => {
+              const Icon = r.icon;
+              const isActive = role === r.id;
+              return (
+                <TouchableOpacity
+                  key={r.id}
+                  style={[
+                    styles.roleBtn,
+                    isActive && { backgroundColor: primaryColor, borderColor: primaryColor },
+                  ]}
+                  onPress={() => setRole(r.id)}
+                  activeOpacity={0.7}
+                >
+                  <Icon size={14} color={isActive ? '#ffffff' : '#64748b'} />
+                  <Text
+                    style={[
+                      styles.roleBtnText,
+                      isActive && { color: '#ffffff', fontWeight: '700' },
+                    ]}
+                  >
+                    {t(r.labelKey)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
         <View style={styles.divider} />
 
-        <TouchableOpacity style={styles.menuItem}>
+        {/* Language Selector */}
+        <View style={styles.languageBox}>
+          <View style={styles.languageLabelRow}>
+            <Globe size={18} color="#64748b" />
+            <Text style={styles.languageLabel}>{t('language')}</Text>
+          </View>
+          <View style={styles.langButtonsRow}>
+            {(['en', 'ru', 'uz'] as Language[]).map((lang) => (
+              <TouchableOpacity
+                key={lang}
+                style={[
+                  styles.langBtn,
+                  language === lang && { backgroundColor: primaryColor, borderColor: primaryColor },
+                ]}
+                onPress={() => setLanguage(lang)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.langBtnText,
+                    language === lang && { color: '#ffffff', fontWeight: '700' },
+                  ]}
+                >
+                  {lang.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.divider} />
+
+        {/* Personal Profile Button */}
+        <TouchableOpacity style={styles.menuItem} onPress={handleProfilePress} activeOpacity={0.6}>
           <User size={20} color="#64748b" />
-          <Text style={styles.menuText}>Personal Profile</Text>
+          <Text style={styles.menuText}>{t('personalProfile')}</Text>
         </TouchableOpacity>
 
         <View style={styles.divider} />
 
-        <TouchableOpacity style={styles.menuItem}>
+        {/* Notifications & Alerts Button */}
+        <TouchableOpacity style={styles.menuItem} onPress={handleNotificationsPress} activeOpacity={0.6}>
           <Bell size={20} color="#64748b" />
-          <Text style={styles.menuText}>Notifications & Alerts</Text>
+          <Text style={styles.menuText}>{t('notifications')}</Text>
         </TouchableOpacity>
 
         <View style={styles.divider} />
 
-        <TouchableOpacity style={styles.menuItem} onPress={toggleTheme}>
+        {/* Theme Toggle Button */}
+        <TouchableOpacity style={styles.menuItem} onPress={toggleTheme} activeOpacity={0.6}>
           <Palette size={20} color={primaryColor} />
           <Text style={[styles.menuText, { color: primaryColor, fontWeight: '600' }]}>
-            Toggle Brand Theme
+            {t('toggleTheme')}
           </Text>
         </TouchableOpacity>
       </Card>
 
-      <TouchableOpacity style={styles.logoutButton}>
+      {/* Sign Out Button */}
+      <TouchableOpacity style={styles.logoutButton} onPress={handleSignOutPress} activeOpacity={0.7}>
         <LogOut size={20} color="#ef4444" />
-        <Text style={styles.logoutText}>Sign Out</Text>
+        <Text style={styles.logoutText}>{t('signOut')}</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -106,12 +166,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  content: {
     padding: 20,
     paddingTop: 40,
   },
   profileSection: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   avatarPlaceholder: {
     width: 72,
@@ -146,43 +208,78 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   roleBox: {
-    padding: 16,
+    padding: 14,
     backgroundColor: '#f1f5f9',
   },
   roleLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#475569',
     marginBottom: 10,
     textTransform: 'uppercase',
   },
-  roleButtonsRow: {
+  roleGrid: {
     flexDirection: 'row',
-    gap: 10,
+    flexWrap: 'wrap',
+    gap: 6,
   },
   roleBtn: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
     borderRadius: 8,
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#cbd5e1',
-    gap: 6,
+    gap: 4,
   },
   roleBtnText: {
+    fontSize: 12,
+    color: '#475569',
+  },
+  languageBox: {
+    padding: 14,
+    backgroundColor: '#ffffff',
+  },
+  languageLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  languageLabel: {
     fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  langButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  langBtn: {
+    flex: 1,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f8fafc',
+  },
+  langBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
     color: '#475569',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: 14,
   },
   menuText: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#1e293b',
     marginLeft: 12,
   },
@@ -194,7 +291,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 24,
+    marginTop: 16,
+    marginBottom: 30,
     padding: 14,
     backgroundColor: '#fef2f2',
     borderRadius: 12,
@@ -205,6 +303,6 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontWeight: '600',
     marginLeft: 8,
-    fontSize: 15,
+    fontSize: 14,
   },
 });

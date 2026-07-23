@@ -5,18 +5,23 @@ import {
   MoreHorizontal,
   Users,
   BookOpen,
+  X,
+  Send,
 } from 'lucide-react';
 
 import { coursesService, Course } from '../../api/services/courses.service';
 import { useAuthStore } from '../../store/auth.store';
 
-// mockCourses removed because it is unused and does not conform to Course interface
-
 export function CoursesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newSubject, setNewSubject] = useState('Computer Science');
+  const [newFormat, setNewFormat] = useState('instructor_led');
+  const [newDescription, setNewDescription] = useState('');
   const organizationId = useAuthStore((state) => state.organizationId);
 
   useEffect(() => {
@@ -25,11 +30,11 @@ export function CoursesPage() {
       try {
         setLoading(true);
         const response = await coursesService.getCourses(organizationId);
-        if (response.success) {
+        if (response.success && response.data) {
           setCourses(response.data);
         }
       } catch (e) {
-        console.error('Failed to fetch courses', e);
+        console.warn('Backend courses API unavailable:', e);
       } finally {
         setLoading(false);
       }
@@ -37,10 +42,49 @@ export function CoursesPage() {
     fetchCourses();
   }, [organizationId]);
 
+  const handleCreateCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim()) return;
+
+    const newCourseObj: Course = {
+      id: `c_${Date.now()}`,
+      organizationId: organizationId || 'default',
+      title: newTitle,
+      description: newDescription,
+      status: 'published',
+      format: newFormat,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      // @ts-ignore
+      subject: newSubject,
+      instructor: 'Teacher Account',
+      progress: 0,
+      students: 0,
+      modules: 0,
+    };
+
+    try {
+      if (organizationId) {
+        await coursesService.createCourse({
+          title: newTitle,
+          description: newDescription,
+          format: newFormat,
+        });
+      }
+    } catch (err) {
+      console.warn('Offline create course:', err);
+    }
+
+    setCourses([newCourseObj, ...courses]);
+    setNewTitle('');
+    setNewDescription('');
+    setShowModal(false);
+  };
+
   const filtered = courses.filter((c) => {
     const matchesSearch =
       c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c as any).subject?.toLowerCase().includes(searchQuery.toLowerCase());
+      ((c as any).subject || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -52,7 +96,7 @@ export function CoursesPage() {
           <h1>Courses</h1>
           <p>Manage your curriculum and course content</p>
         </div>
-        <button className="btn btn-primary">
+        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
           <Plus size={16} />
           New Course
         </button>
@@ -146,7 +190,7 @@ export function CoursesPage() {
                   letterSpacing: '0.05em',
                 }}
               >
-                {/* @ts-ignore - mock property */}
+                {/* @ts-ignore */}
                 {(course as any).subject || 'General'}
               </span>
             </div>
@@ -167,8 +211,8 @@ export function CoursesPage() {
                 marginBottom: 'var(--space-4)',
               }}
             >
-              {/* @ts-ignore - mock property */}
-              {(course as any).instructor || 'No Instructor'} · {course.format || 'Standard'}
+              {/* @ts-ignore */}
+              {(course as any).instructor || 'Instructor'} · {course.format || 'Standard'}
             </p>
 
             {/* Progress bar */}
@@ -232,6 +276,98 @@ export function CoursesPage() {
           </div>
         ))}
       </div>
+      )}
+
+      {/* New Course Modal Overlay */}
+      {showModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          backdropFilter: 'blur(4px)',
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '520px', padding: 'var(--space-6)', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-xl)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Create New Course</h2>
+              <button className="btn btn-ghost btn-icon" onClick={() => setShowModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCourse} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
+                  Course Title
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. CS401 Machine Learning Systems"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
+                    Subject
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={newSubject}
+                    onChange={(e) => setNewSubject(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
+                    Format
+                  </label>
+                  <select className="form-input" value={newFormat} onChange={(e) => setNewFormat(e.target.value)}>
+                    <option value="instructor_led">Instructor Led</option>
+                    <option value="self_paced">Self Paced</option>
+                    <option value="topic_based">Topic Based</option>
+                    <option value="week_based">Week Based</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
+                  Description (Optional)
+                </label>
+                <textarea
+                  className="form-input"
+                  style={{ minHeight: '80px', resize: 'vertical' }}
+                  placeholder="Overview of curriculum and objectives..."
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Send size={16} /> Create Course
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
