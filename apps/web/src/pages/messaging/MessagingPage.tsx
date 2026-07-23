@@ -1,514 +1,379 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Search, Paperclip, Smile, MoreVertical, Plus, X } from 'lucide-react';
-
-interface Conversation {
-  id: string;
-  name: string;
-  avatar: string;
-  lastMessage: string;
-  time: string;
-  unread: number;
-  online: boolean;
-}
-
-interface Message {
-  id: string;
-  sender: string;
-  content: string;
-  time: string;
-  isOwn: boolean;
-}
-
-const initialConversations: Conversation[] = [
-  { id: '1', name: 'Dr. Sarah Chen', avatar: 'SC', lastMessage: 'The lab report deadline has been extended...', time: '2 min', unread: 2, online: true },
-  { id: '2', name: 'Physics 101 Group', avatar: 'P1', lastMessage: 'Has everyone completed the pre-lab?', time: '15 min', unread: 5, online: false },
-  { id: '3', name: 'Prof. James Wilson', avatar: 'JW', lastMessage: 'Grade corrections have been posted', time: '1 hr', unread: 0, online: true },
-  { id: '4', name: 'Emma Rodriguez', avatar: 'ER', lastMessage: 'Thank you for the feedback!', time: '3 hr', unread: 0, online: false },
-  { id: '5', name: 'Staff Announcements', avatar: 'SA', lastMessage: 'Reminder: Faculty meeting tomorrow at 2 PM', time: '5 hr', unread: 1, online: false },
-];
-
-const initialMessagesMap: Record<string, Message[]> = {
-  '1': [
-    { id: 'm1_1', sender: 'Dr. Sarah Chen', content: 'Hi! I wanted to let you know about the upcoming changes to the Physics 101 syllabus.', time: '10:30 AM', isOwn: false },
-    { id: 'm1_2', sender: 'You', content: 'Thanks for the heads up. What are the main changes?', time: '10:32 AM', isOwn: true },
-    { id: 'm1_3', sender: 'Dr. Sarah Chen', content: 'We\'re adding a new module on quantum entanglement and extending the lab report deadline by one week.', time: '10:35 AM', isOwn: false },
-    { id: 'm1_4', sender: 'You', content: 'That sounds great! The students will appreciate the extra time for the lab reports.', time: '10:36 AM', isOwn: true },
-    { id: 'm1_5', sender: 'Dr. Sarah Chen', content: 'The lab report deadline has been extended to next Friday. Please share this with your students.', time: '10:40 AM', isOwn: false },
-  ],
-  '2': [
-    { id: 'm2_1', sender: 'Alex', content: 'Hey everyone, working on Problem Set 4 right now.', time: '11:10 AM', isOwn: false },
-    { id: 'm2_2', sender: 'You', content: 'Are you stuck on Question 3 or 4?', time: '11:12 AM', isOwn: true },
-    { id: 'm2_3', sender: 'Alex', content: 'Has everyone completed the pre-lab?', time: '11:15 AM', isOwn: false },
-  ],
-  '3': [
-    { id: 'm3_1', sender: 'Prof. James Wilson', content: 'Hello! I reviewed your midterm paper draft.', time: '09:15 AM', isOwn: false },
-    { id: 'm3_2', sender: 'Prof. James Wilson', content: 'Grade corrections have been posted', time: '09:20 AM', isOwn: false },
-  ],
-  '4': [
-    { id: 'm4_1', sender: 'Emma Rodriguez', content: 'Hi Dr. Jenkins, thanks for explaining the lab procedure.', time: '08:00 AM', isOwn: false },
-    { id: 'm4_2', sender: 'Emma Rodriguez', content: 'Thank you for the feedback!', time: '08:05 AM', isOwn: false },
-  ],
-  '5': [
-    { id: '5_1', sender: 'Staff Announcements', content: 'Reminder: Faculty meeting tomorrow at 2 PM in Room 302.', time: '07:30 AM', isOwn: false },
-  ],
-};
+import { Send, Search, Paperclip, Smile, MoreVertical, Plus, X, FileText } from 'lucide-react';
+import { messagingService, Conversation, Message } from '../../api/services/messaging.service';
+import { storageService } from '../../api/services/storage.service';
 
 export function MessagingPage() {
-  const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
-  const [selectedConvoId, setSelectedConvoId] = useState<string>('1');
-  const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>(initialMessagesMap);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConvoId, setSelectedConvoId] = useState<string>('');
+  const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>({});
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [newContactName, setNewContactName] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [attachedFiles, setAttachedFiles] = useState<{ name: string; size: string; url?: string }[]>([]);
 
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatFileInputRef = useRef<HTMLInputElement>(null);
 
-  const selectedConvo = conversations.find((c) => c.id === selectedConvoId) || conversations[0];
-  const currentMessages = messagesMap[selectedConvoId] || [];
-
-  // Auto-scroll chat to bottom on new message or conversation select
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [selectedConvoId, currentMessages.length]);
+    async function fetchConversations() {
+      setLoading(true);
+      try {
+        const res = await messagingService.getConversations();
+        if (res.success && res.data && res.data.length > 0) {
+          setConversations(res.data);
+          setSelectedConvoId(res.data[0].id);
+        }
+      } catch (err) {
+        console.warn('Backend messaging service returned empty or unseeded data.', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchConversations();
+  }, []);
 
-  // Select conversation & mark unread as read
-  const handleSelectConvo = (convoId: string) => {
-    setSelectedConvoId(convoId);
-    setConversations((prev) =>
-      prev.map((c) => (c.id === convoId ? { ...c, unread: 0 } : c))
-    );
+  useEffect(() => {
+    if (!selectedConvoId) return;
+    async function fetchMessages() {
+      try {
+        const res = await messagingService.getMessages(selectedConvoId);
+        if (res.success && res.data) {
+          setMessagesMap((prev) => ({ ...prev, [selectedConvoId]: res.data }));
+        }
+      } catch (err) {
+        console.warn('Failed to fetch messages for conversation.', err);
+      }
+    }
+    fetchMessages();
+  }, [selectedConvoId]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleSendMessage = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!messageInput.trim()) return;
+  useEffect(() => {
+    scrollToBottom();
+  }, [messagesMap, selectedConvoId]);
 
-    const text = messageInput.trim();
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const currentConvo = conversations.find((c) => c.id === selectedConvoId);
+  const currentMessages = selectedConvoId ? messagesMap[selectedConvoId] || [] : [];
 
-    const newMsg: Message = {
-      id: `msg_${Date.now()}`,
+  const handleChatFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      let fileUrl: string | undefined;
+      try {
+        const uploadRes = await storageService.uploadFile(file);
+        if (uploadRes.success && uploadRes.data?.url) {
+          fileUrl = uploadRes.data.url;
+        }
+      } catch (err) {
+        console.warn('Upload fallback.', err);
+      }
+
+      setAttachedFiles((prev) => [
+        ...prev,
+        {
+          name: file.name,
+          size: `${(file.size / 1024).toFixed(1)} KB`,
+          url: fileUrl,
+        },
+      ]);
+    }
+
+    if (chatFileInputRef.current) chatFileInputRef.current.value = '';
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if ((!messageInput.trim() && attachedFiles.length === 0) || !selectedConvoId) return;
+
+    let fullContent = messageInput.trim();
+    if (attachedFiles.length > 0) {
+      const fileListStr = attachedFiles.map((f) => `📎 ${f.name} (${f.size})`).join('\n');
+      fullContent = fullContent ? `${fullContent}\n\n${fileListStr}` : fileListStr;
+    }
+
+    const newMessage: Message = {
+      id: `m_${Date.now()}`,
       sender: 'You',
-      content: text,
-      time: timeStr,
+      content: fullContent,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       isOwn: true,
     };
 
-    // Update messages for current conversation
+    try {
+      await messagingService.sendMessage(selectedConvoId, fullContent);
+    } catch (err) {
+      console.warn('Send message backend API error.', err);
+    }
+
     setMessagesMap((prev) => ({
       ...prev,
-      [selectedConvoId]: [...(prev[selectedConvoId] || []), newMsg],
+      [selectedConvoId]: [...(prev[selectedConvoId] || []), newMessage],
     }));
 
-    // Update conversation item in sidebar
     setConversations((prev) =>
       prev.map((c) =>
         c.id === selectedConvoId
-          ? { ...c, lastMessage: text, time: 'Just now' }
+          ? { ...c, lastMessage: fullContent.split('\n')[0], time: 'Just now', unread: 0 }
           : c
       )
     );
 
     setMessageInput('');
+    setAttachedFiles([]);
   };
 
-  const handleCreateNewChat = (e: React.FormEvent) => {
+  const handleStartNewChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newContactName.trim()) return;
 
-    const newId = `c_${Date.now()}`;
     const initials = newContactName
       .split(' ')
-      .map((part) => part[0])
+      .map((n) => n[0])
       .join('')
       .toUpperCase()
-      .slice(0, 2) || 'NC';
+      .slice(0, 2);
 
     const newConvo: Conversation = {
-      id: newId,
-      name: newContactName.trim(),
-      avatar: initials,
+      id: Date.now().toString(),
+      name: newContactName,
+      avatar: initials || 'NC',
       lastMessage: 'Conversation started',
       time: 'Just now',
       unread: 0,
       online: true,
     };
 
+    try {
+      await messagingService.createConversation(newContactName);
+    } catch (err) {
+      console.warn('Create conversation backend API error.', err);
+    }
+
     setConversations([newConvo, ...conversations]);
     setMessagesMap((prev) => ({
       ...prev,
-      [newId]: [
-        {
-          id: `msg_init_${Date.now()}`,
-          sender: newContactName,
-          content: `Hello! Started new conversation with ${newContactName}.`,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          isOwn: false,
-        },
-      ],
+      [newConvo.id]: [],
     }));
-
-    setSelectedConvoId(newId);
+    setSelectedConvoId(newConvo.id);
     setNewContactName('');
     setShowNewChatModal(false);
   };
 
-  const filteredConversations = conversations.filter(
-    (c) =>
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredConversations = conversations.filter((c) =>
+    c.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <div
-      className="animate-fade-in"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '340px 1fr',
-        gap: 0,
-        height: 'calc(100vh - var(--topbar-height) - 90px)',
-        maxHeight: 'calc(100vh - var(--topbar-height) - 90px)',
-        border: '1px solid var(--border-color)',
-        borderRadius: 'var(--radius-xl)',
-        overflow: 'hidden',
-        boxSizing: 'border-box',
-      }}
-    >
-      {/* Conversation List */}
-      <div
-        style={{
-          background: 'var(--bg-secondary)',
-          borderRight: '1px solid var(--border-color)',
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Header & Search */}
-        <div style={{ padding: 'var(--space-4)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ fontSize: '1.125rem', fontWeight: 700 }}>Messages</h2>
-            <button
-              className="btn btn-primary"
-              style={{ padding: '4px 10px', fontSize: '0.8125rem', gap: '4px' }}
-              onClick={() => setShowNewChatModal(true)}
-            >
-              <Plus size={14} /> New Chat
-            </button>
+    <div className="animate-fade-in" style={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
+      <div className="page-header" style={{ marginBottom: 'var(--space-4)' }}>
+        <div className="page-header-left">
+          <h1>Direct Messaging</h1>
+          <p>Real-time chat with faculty, students, and course groups</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setShowNewChatModal(true)}>
+          <Plus size={16} /> New Chat
+        </button>
+      </div>
+
+      <div className="card" style={{ flex: 1, display: 'flex', overflow: 'hidden', padding: 0 }}>
+        {/* Left Sidebar: Conversations Roster */}
+        <div style={{ width: '320px', borderRight: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--border-color)' }}>
+            <div className="topbar-search" style={{ width: '100%' }}>
+              <Search size={16} style={{ color: 'var(--text-tertiary)' }} />
+              <input
+                placeholder="Search conversations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="topbar-search" style={{ minWidth: 'unset' }}>
-            <Search size={16} style={{ color: 'var(--text-tertiary)' }} />
-            <input
-              placeholder="Search messages..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
+
+          {loading ? (
+            <div style={{ padding: 'var(--space-6)', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              Loading chats...
+            </div>
+          ) : filteredConversations.length === 0 ? (
+            <div style={{ padding: 'var(--space-6)', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+              No chats found. Click "New Chat" to start messaging.
+            </div>
+          ) : (
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {filteredConversations.map((convo) => (
+                <div
+                  key={convo.id}
+                  onClick={() => setSelectedConvoId(convo.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-3)',
+                    padding: 'var(--space-3) var(--space-4)',
+                    cursor: 'pointer',
+                    backgroundColor: selectedConvoId === convo.id ? 'var(--bg-tertiary)' : 'transparent',
+                    borderBottom: '1px solid var(--border-color)',
+                  }}
+                >
+                  <div className="avatar" style={{ width: '40px', height: '40px', fontSize: '0.875rem' }}>
+                    {convo.avatar}
+                  </div>
+                  <div style={{ flex: 1, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                      <span style={{ fontWeight: 600, fontSize: '0.9375rem' }}>{convo.name}</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{convo.time}</span>
+                    </div>
+                    <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {convo.lastMessage}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Conversation items */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          {filteredConversations.map((convo) => (
-            <div
-              key={convo.id}
-              onClick={() => handleSelectConvo(convo.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-3)',
-                padding: 'var(--space-3) var(--space-4)',
-                cursor: 'pointer',
-                background:
-                  selectedConvo.id === convo.id
-                    ? 'rgba(99, 102, 241, 0.12)'
-                    : 'transparent',
-                borderLeft:
-                  selectedConvo.id === convo.id
-                    ? '3px solid var(--color-primary-500)'
-                    : '3px solid transparent',
-                transition: 'all var(--transition-fast)',
-              }}
-            >
-              <div style={{ position: 'relative' }}>
-                <div className="avatar avatar-sm">{convo.avatar}</div>
-                {convo.online && (
+        {/* Right Pane: Active Message Thread */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          {currentConvo ? (
+            <>
+              {/* Header */}
+              <div style={{ padding: 'var(--space-4) var(--space-6)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                  <div className="avatar" style={{ width: '36px', height: '36px', fontSize: '0.875rem' }}>
+                    {currentConvo.avatar}
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>{currentConvo.name}</h3>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--color-success-600)' }}>Active Channel</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Message List */}
+              <div style={{ flex: 1, padding: 'var(--space-6)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                {currentMessages.map((m) => (
                   <div
+                    key={m.id}
                     style={{
-                      position: 'absolute',
-                      bottom: 0,
-                      right: 0,
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: 'var(--color-accent-500)',
-                      border: '2px solid var(--bg-secondary)',
+                      alignSelf: m.isOwn ? 'flex-end' : 'flex-start',
+                      maxWidth: '70%',
+                      padding: 'var(--space-3) var(--space-4)',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: m.isOwn ? 'var(--color-primary-600)' : 'var(--bg-tertiary)',
+                      color: m.isOwn ? '#ffffff' : 'var(--text-primary)',
+                      whiteSpace: 'pre-line',
                     }}
-                  />
-                )}
+                  >
+                    {!m.isOwn && (
+                      <div style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '2px', color: 'var(--color-primary-400)' }}>
+                        {m.sender}
+                      </div>
+                    )}
+                    <p style={{ fontSize: '0.9375rem', lineHeight: 1.4 }}>{m.content}</p>
+                    <div style={{ fontSize: '0.6875rem', textAlign: 'right', marginTop: '4px', opacity: 0.8 }}>
+                      {m.time}
+                    </div>
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontWeight: convo.unread > 0 ? 700 : 500,
-                      fontSize: '0.875rem',
-                    }}
-                  >
-                    {convo.name}
-                  </span>
-                  <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)' }}>
-                    {convo.time}
-                  </span>
-                </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: '0.8125rem',
-                      color: convo.unread > 0 ? 'var(--text-secondary)' : 'var(--text-tertiary)',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      maxWidth: '180px',
-                    }}
-                  >
-                    {convo.lastMessage}
-                  </span>
-                  {convo.unread > 0 && (
-                    <span
-                      style={{
-                        background: 'var(--color-primary-500)',
-                        color: 'white',
-                        fontSize: '0.6875rem',
-                        fontWeight: 700,
-                        borderRadius: 'var(--radius-full)',
-                        width: '20px',
-                        height: '20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {convo.unread}
+
+              {/* Attached Pending Files Bar */}
+              {attachedFiles.length > 0 && (
+                <div style={{ padding: 'var(--space-2) var(--space-6)', backgroundColor: 'var(--bg-tertiary)', display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                  {attachedFiles.map((f, idx) => (
+                    <span key={idx} className="badge badge-purple" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <FileText size={12} /> {f.name} ({f.size})
+                      <X size={12} style={{ cursor: 'pointer' }} onClick={() => setAttachedFiles(attachedFiles.filter((_, i) => i !== idx))} />
                     </span>
-                  )}
+                  ))}
                 </div>
-              </div>
+              )}
+
+              {/* Input Form */}
+              <form onSubmit={handleSendMessage} style={{ padding: 'var(--space-4) var(--space-6)', borderTop: '1px solid var(--border-color)', display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+                <input
+                  type="file"
+                  ref={chatFileInputRef}
+                  style={{ display: 'none' }}
+                  multiple
+                  onChange={handleChatFileSelect}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-icon"
+                  onClick={() => chatFileInputRef.current?.click()}
+                  title="Attach File"
+                >
+                  <Paperclip size={18} />
+                </button>
+                <input
+                  className="form-input"
+                  style={{ flex: 1 }}
+                  placeholder="Type a message..."
+                  value={messageInput}
+                  onChange={(e) => setMessageInput(e.target.value)}
+                />
+                <button type="submit" className="btn btn-primary">
+                  <Send size={16} /> Send
+                </button>
+              </form>
+            </>
+          ) : (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)' }}>
+              Select a conversation from the left to start messaging
             </div>
-          ))}
+          )}
         </div>
       </div>
 
-      {/* Chat Area */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          background: 'var(--bg-primary)',
-          height: '100%',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Chat Header */}
+      {/* New Chat Modal */}
+      {showNewChatModal && (
         <div
           style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: 'var(--space-4) var(--space-6)',
-            borderBottom: '1px solid var(--border-color)',
-            flexShrink: 0,
+            justifyContent: 'center',
+            zIndex: 1000,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-            <div className="avatar">{selectedConvo.avatar}</div>
-            <div>
-              <div style={{ fontWeight: 600 }}>{selectedConvo.name}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
-                {selectedConvo.online ? (
-                  <span style={{ color: 'var(--color-accent-400)' }}>● Online</span>
-                ) : (
-                  'Offline'
-                )}
-              </div>
-            </div>
-          </div>
-          <button className="btn btn-ghost btn-icon">
-            <MoreVertical size={18} />
-          </button>
-        </div>
-
-        {/* Messages */}
-        <div
-          style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: 'auto',
-            padding: 'var(--space-6)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--space-4)',
-          }}
-        >
-          {currentMessages.map((msg) => (
-            <div
-              key={msg.id}
-              style={{
-                display: 'flex',
-                justifyContent: msg.isOwn ? 'flex-end' : 'flex-start',
-              }}
-            >
-              <div
-                style={{
-                  maxWidth: '60%',
-                  padding: 'var(--space-3) var(--space-4)',
-                  borderRadius: msg.isOwn
-                    ? 'var(--radius-xl) var(--radius-xl) var(--radius-sm) var(--radius-xl)'
-                    : 'var(--radius-xl) var(--radius-xl) var(--radius-xl) var(--radius-sm)',
-                  background: msg.isOwn
-                    ? 'linear-gradient(135deg, var(--color-primary-600), var(--color-primary-500))'
-                    : 'var(--bg-elevated)',
-                  border: msg.isOwn ? 'none' : '1px solid var(--border-color)',
-                  color: msg.isOwn ? '#ffffff' : 'var(--text-primary)',
-                }}
-              >
-                <div style={{ fontSize: '0.875rem', lineHeight: 1.5 }}>{msg.content}</div>
-                <div
-                  style={{
-                    fontSize: '0.6875rem',
-                    color: msg.isOwn ? 'rgba(255,255,255,0.7)' : 'var(--text-tertiary)',
-                    marginTop: 'var(--space-1)',
-                    textAlign: 'right',
-                  }}
-                >
-                  {msg.time}
-                </div>
-              </div>
-            </div>
-          ))}
-          <div ref={chatEndRef} />
-        </div>
-
-        {/* Message Input Bar */}
-        <form
-          onSubmit={handleSendMessage}
-          style={{
-            padding: 'var(--space-3) var(--space-6)',
-            borderTop: '1px solid var(--border-color)',
-            background: 'var(--bg-secondary)',
-            flexShrink: 0,
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-3)',
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-xl)',
-              padding: 'var(--space-2) var(--space-4)',
-            }}
-          >
-            <button type="button" className="btn btn-ghost btn-icon" style={{ width: '32px', height: '32px' }}>
-              <Paperclip size={18} />
-            </button>
-            <input
-              style={{
-                flex: 1,
-                background: 'none',
-                border: 'none',
-                color: 'var(--text-primary)',
-                fontFamily: 'var(--font-sans)',
-                fontSize: '0.875rem',
-                outline: 'none',
-              }}
-              placeholder={`Message ${selectedConvo.name}...`}
-              value={messageInput}
-              onChange={(e) => setMessageInput(e.target.value)}
-            />
-            <button type="button" className="btn btn-ghost btn-icon" style={{ width: '32px', height: '32px' }}>
-              <Smile size={18} />
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{
-                width: '36px',
-                height: '36px',
-                padding: 0,
-                borderRadius: 'var(--radius-full)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <Send size={16} />
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* New Chat Modal Overlay */}
-      {showNewChatModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          backdropFilter: 'blur(4px)',
-        }}>
-          <div className="card" style={{ width: '100%', maxWidth: '440px', padding: 'var(--space-6)', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-xl)' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '400px', padding: 'var(--space-6)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
-              <h2 style={{ fontSize: '1.125rem', fontWeight: 700 }}>Start New Conversation</h2>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Start New Conversation</h2>
               <button className="btn btn-ghost btn-icon" onClick={() => setShowNewChatModal(false)}>
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateNewChat} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
-                  Recipient Name / Student / Faculty
-                </label>
+            <form onSubmit={handleStartNewChat}>
+              <div className="form-group">
+                <label className="form-label">Contact / Group Name</label>
                 <input
-                  type="text"
                   className="form-input"
-                  placeholder="e.g. Dr. Robert Miller"
+                  placeholder="e.g. Prof. James Wilson"
                   value={newContactName}
                   onChange={(e) => setNewContactName(e.target.value)}
-                  autoFocus
                   required
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-6)' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowNewChatModal(false)}>
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Start Chat
+                  Create Chat
                 </button>
               </div>
             </form>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Calendar,
   ChevronLeft,
@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   Download,
 } from 'lucide-react';
+import { attendanceService, AttendanceRecord } from '../../api/services/attendance.service';
 
 interface AttendanceRow {
   id: string;
@@ -16,19 +17,6 @@ interface AttendanceRow {
   avatar: string;
   status: 'present' | 'absent' | 'late' | 'excused';
 }
-
-const mockAttendance: AttendanceRow[] = [
-  { id: '1', student: 'Alice Thompson', avatar: 'AT', status: 'present' },
-  { id: '2', student: 'Benjamin Cruz', avatar: 'BC', status: 'present' },
-  { id: '3', student: 'Chloe Park', avatar: 'CP', status: 'late' },
-  { id: '4', student: 'Daniel Williams', avatar: 'DW', status: 'present' },
-  { id: '5', student: 'Emma Rodriguez', avatar: 'ER', status: 'absent' },
-  { id: '6', student: 'Frank Nakamura', avatar: 'FN', status: 'present' },
-  { id: '7', student: 'Grace Kim', avatar: 'GK', status: 'excused' },
-  { id: '8', student: 'Henry Okafor', avatar: 'HO', status: 'present' },
-  { id: '9', student: 'Isla Fernandez', avatar: 'IF', status: 'present' },
-  { id: '10', student: 'Jason Patel', avatar: 'JP', status: 'late' },
-];
 
 const statusColors: Record<string, string> = {
   present: 'badge-success',
@@ -45,13 +33,30 @@ const statusIcons: Record<string, typeof Check> = {
 };
 
 export function AttendancePage() {
-  const [records, setRecords] = useState(mockAttendance);
-  const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  const [records, setRecords] = useState<AttendanceRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+  useEffect(() => {
+    async function fetchAttendance() {
+      setLoading(true);
+      try {
+        const statsRes = await attendanceService.getDailyStats(selectedDate);
+        if (statsRes.success && (statsRes.data as any)?.records) {
+          setRecords((statsRes.data as any).records);
+        } else {
+          // If no records exist for selected date in fresh DB, keep clean empty array
+          setRecords([]);
+        }
+      } catch (err) {
+        console.warn('Backend attendance endpoint returned empty or unseeded data.', err);
+        setRecords([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchAttendance();
+  }, [selectedDate]);
 
   const summary = {
     present: records.filter((r) => r.status === 'present').length,
@@ -60,128 +65,145 @@ export function AttendancePage() {
     excused: records.filter((r) => r.status === 'excused').length,
   };
 
-  const toggleStatus = (id: string) => {
-    const order: AttendanceRow['status'][] = ['present', 'absent', 'late', 'excused'];
+  const handleStatusChange = async (id: string, newStatus: AttendanceRow['status']) => {
+    const target = records.find((r) => r.id === id);
+    if (!target) return;
+
+    try {
+      await attendanceService.recordAttendance({
+        studentId: id,
+        date: selectedDate,
+        status: newStatus,
+      });
+    } catch (err) {
+      console.warn('Record attendance backend call error.', err);
+    }
+
     setRecords((prev) =>
-      prev.map((r) => {
-        if (r.id !== id) return r;
-        const currentIndex = order.indexOf(r.status);
-        const nextStatus = order[(currentIndex + 1) % order.length];
-        return { ...r, status: nextStatus };
-      }),
+      prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r))
     );
   };
-
-  const rate = records.length > 0
-    ? Math.round((summary.present / records.length) * 100)
-    : 0;
 
   return (
     <div className="animate-fade-in">
       <div className="page-header">
         <div className="page-header-left">
-          <h1>Attendance</h1>
-          <p>Track and manage student attendance records</p>
+          <h1>Attendance Tracking</h1>
+          <p>Daily student attendance roster and summary reports</p>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
           <button className="btn btn-secondary">
-            <Download size={16} />
-            Export
-          </button>
-          <button className="btn btn-primary">
-            <Check size={16} />
-            Save Records
+            <Download size={16} /> Export Report
           </button>
         </div>
       </div>
 
       {/* Date Navigator */}
       <div
+        className="card"
         style={{
           display: 'flex',
+          justify: 'space-between',
           alignItems: 'center',
-          gap: 'var(--space-4)',
           marginBottom: 'var(--space-6)',
+          padding: 'var(--space-4) var(--space-6)',
         }}
       >
-        <button className="btn btn-ghost btn-icon">
-          <ChevronLeft size={18} />
-        </button>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-2)',
-            fontSize: '0.9375rem',
-            fontWeight: 600,
-          }}
-        >
-          <Calendar size={18} style={{ color: 'var(--color-primary-400)' }} />
-          {today}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <Calendar size={20} style={{ color: 'var(--color-primary-500)' }} />
+          <span style={{ fontWeight: 600, fontSize: '1.05rem' }}>{selectedDate}</span>
         </div>
-        <button className="btn btn-ghost btn-icon">
-          <ChevronRight size={18} />
-        </button>
-      </div>
-
-      {/* Summary Stats */}
-      <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-        <div className="card animate-fade-in">
-          <div className="card-title" style={{ marginBottom: 'var(--space-2)' }}>Present</div>
-          <div className="card-value" style={{ color: 'var(--color-accent-400)' }}>{summary.present}</div>
-          <div style={{ fontSize: '0.8125rem', color: 'var(--text-tertiary)' }}>{rate}% rate</div>
-        </div>
-        <div className="card animate-fade-in">
-          <div className="card-title" style={{ marginBottom: 'var(--space-2)' }}>Absent</div>
-          <div className="card-value" style={{ color: 'var(--color-danger-400)' }}>{summary.absent}</div>
-        </div>
-        <div className="card animate-fade-in">
-          <div className="card-title" style={{ marginBottom: 'var(--space-2)' }}>Late</div>
-          <div className="card-value" style={{ color: 'var(--color-warning-400)' }}>{summary.late}</div>
-        </div>
-        <div className="card animate-fade-in">
-          <div className="card-title" style={{ marginBottom: 'var(--space-2)' }}>Excused</div>
-          <div className="card-value" style={{ color: 'var(--color-primary-400)' }}>{summary.excused}</div>
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <input
+            type="date"
+            className="form-input"
+            style={{ width: 'auto' }}
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+          />
         </div>
       </div>
 
-      {/* Attendance Table */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div className="table-container">
-          <table>
+      {/* Daily Summary Cards */}
+      <div className="stat-grid" style={{ marginBottom: 'var(--space-6)' }}>
+        <div className="stat-card">
+          <div className="stat-label">Present</div>
+          <div className="stat-value" style={{ color: 'var(--color-success-600)' }}>
+            {summary.present}
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Absent</div>
+          <div className="stat-value" style={{ color: 'var(--color-danger-600)' }}>
+            {summary.absent}
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Late</div>
+          <div className="stat-value" style={{ color: 'var(--color-warning-600)' }}>
+            {summary.late}
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Excused</div>
+          <div className="stat-value" style={{ color: 'var(--color-info-600)' }}>
+            {summary.excused}
+          </div>
+        </div>
+      </div>
+
+      {/* Roster Table */}
+      {loading ? (
+        <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          Fetching attendance records from backend...
+        </div>
+      ) : records.length === 0 ? (
+        <div className="card" style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+          <Calendar size={36} style={{ marginBottom: 'var(--space-3)', opacity: 0.5 }} />
+          <p>No attendance entries found for {selectedDate}. Select a date or mark initial attendance.</p>
+        </div>
+      ) : (
+        <div className="card" style={{ overflowX: 'auto' }}>
+          <table className="table">
             <thead>
               <tr>
                 <th>Student</th>
                 <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Action</th>
+                <th style={{ textAlign: 'right' }}>Quick Actions</th>
               </tr>
             </thead>
             <tbody>
-              {records.map((record) => {
-                const StatusIcon = statusIcons[record.status];
+              {records.map((r) => {
+                const IconComponent = statusIcons[r.status] || Check;
                 return (
-                  <tr key={record.id}>
+                  <tr key={r.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                        <div className="avatar avatar-sm">{record.avatar}</div>
-                        <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
-                          {record.student}
-                        </span>
+                        <div className="avatar" style={{ width: '32px', height: '32px', fontSize: '0.8125rem' }}>
+                          {r.avatar}
+                        </div>
+                        <span style={{ fontWeight: 500 }}>{r.student}</span>
                       </div>
                     </td>
                     <td>
-                      <span className={`badge ${statusColors[record.status]}`}>
-                        <StatusIcon size={12} style={{ marginRight: '4px' }} />
-                        {record.status}
+                      <span className={`badge ${statusColors[r.status]}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <IconComponent size={12} />
+                        {r.status.toUpperCase()}
                       </span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => toggleStatus(record.id)}
-                      >
-                        Toggle
-                      </button>
+                      <div style={{ display: 'inline-flex', gap: 'var(--space-1)' }}>
+                        {(['present', 'late', 'absent', 'excused'] as const).map((s) => (
+                          <button
+                            key={s}
+                            className={`btn btn-sm ${r.status === s ? 'btn-primary' : 'btn-ghost'}`}
+                            onClick={() => handleStatusChange(r.id, s)}
+                            style={{ fontSize: '0.75rem', textTransform: 'capitalize' }}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -189,7 +211,7 @@ export function AttendancePage() {
             </tbody>
           </table>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
-import { Search, Settings, Plus, Paperclip, FileText, FileCode, Download as DownloadIcon, X, Send, ClipboardList } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, Settings, Plus, FileText, FileCode, X, ClipboardList, UploadCloud } from 'lucide-react';
+import { coursesService, Course } from '../../api/services/courses.service';
+import { GradeEntry } from '../../api/services/gradebook.service';
+import { storageService } from '../../api/services/storage.service';
 
 interface ContextFile {
   id: string;
   name: string;
   size: string;
   type: 'pdf' | 'code' | 'doc' | 'data';
+  url?: string;
 }
 
 interface WebAssignment {
@@ -28,45 +32,95 @@ interface Student {
   avatar: string;
 }
 
-interface GradeEntry {
-  studentId: string;
-  assignmentId: string;
-  score: number | null;
-}
-
 export function GradebookPage() {
   const [activeTab, setActiveTab] = useState<'assignments' | 'gradebook'>('assignments');
   const [assignments, setAssignments] = useState<WebAssignment[]>([]);
   const [students] = useState<Student[]>([]);
   const [grades] = useState<GradeEntry[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Teams Assignment Form State
   const [newTitle, setNewTitle] = useState('');
-  const [newCourse, setNewCourse] = useState('CS301 Data Structures');
+  const [newCourse, setNewCourse] = useState('');
   const [newMaxScore, setNewMaxScore] = useState('100');
   const [newInstructions, setNewInstructions] = useState('');
   const [newRubric, setNewRubric] = useState('Correctness (50%), Code Quality (50%)');
   const [attachedFiles, setAttachedFiles] = useState<ContextFile[]>([]);
-  const [newFileName, setNewFileName] = useState('');
+  const [uploading, setUploading] = useState(false);
 
-  const handleAddContextFile = () => {
-    if (!newFileName.trim()) return;
-    const ext = newFileName.split('.').pop()?.toLowerCase();
-    let fileType: ContextFile['type'] = 'pdf';
-    if (ext === 'py' || ext === 'ts' || ext === 'js' || ext === 'sql') fileType = 'code';
-    if (ext === 'doc' || ext === 'docx' || ext === 'txt') fileType = 'doc';
-    if (ext === 'csv' || ext === 'json' || ext === 'xlsx') fileType = 'data';
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const newFile: ContextFile = {
-      id: `file_${Date.now()}`,
-      name: newFileName.trim(),
-      size: `${(Math.random() * 2 + 0.5).toFixed(1)} MB`,
-      type: fileType,
-    };
-    setAttachedFiles([...attachedFiles, newFile]);
-    setNewFileName('');
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true);
+      try {
+        const res = await coursesService.getCourses('default-org');
+        if (res.success && res.data) {
+          setCourses(res.data);
+          if (res.data.length > 0) {
+            setNewCourse(res.data[0].title);
+          }
+        }
+      } catch (err) {
+        console.warn('Backend service offline or returning empty. Displaying clean view.', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const determineFileType = (fileName: string): ContextFile['type'] => {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    if (['py', 'ts', 'js', 'sql', 'cpp', 'java', 'html', 'css', 'json'].includes(ext || '')) return 'code';
+    if (['doc', 'docx', 'txt', 'rtf'].includes(ext || '')) return 'doc';
+    if (['csv', 'xlsx', 'xls'].includes(ext || '')) return 'data';
+    return 'pdf';
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    const newAttachments: ContextFile[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      let fileUrl: string | undefined;
+
+      try {
+        const uploadRes = await storageService.uploadFile(file);
+        if (uploadRes.success && uploadRes.data?.url) {
+          fileUrl = uploadRes.data.url;
+        }
+      } catch (err) {
+        console.warn('Direct backend upload fallback (using browser file metadata).', err);
+      }
+
+      newAttachments.push({
+        id: `file_${Date.now()}_${i}`,
+        name: file.name,
+        size: formatFileSize(file.size),
+        type: determineFileType(file.name),
+        url: fileUrl,
+      });
+    }
+
+    setAttachedFiles((prev: ContextFile[]) => [...prev, ...newAttachments]);
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleRemoveContextFile = (fileId: string) => {
@@ -80,7 +134,7 @@ export function GradebookPage() {
     const newAssn: WebAssignment = {
       id: `a_${Date.now()}`,
       title: newTitle,
-      course: newCourse,
+      course: newCourse || 'CS301 Data Structures',
       category: 'Homework',
       dueDate: 'In 7 days, 11:59 PM',
       totalSubmissions: 0,
@@ -194,292 +248,286 @@ export function GradebookPage() {
         </div>
       </div>
 
-      {/* TAB 1: Teams Assignments View */}
-      {activeTab === 'assignments' && (
-        filteredAssignments.length === 0 ? (
-          <div className="card" style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-tertiary)' }}>
-            No assignments created yet. Click <strong>+ Create Assignment</strong> to publish an assignment with context files!
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            {filteredAssignments.map((assn: WebAssignment) => (
-              <div key={assn.id} className="card" style={{ padding: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-primary-400)', textTransform: 'uppercase' }}>
-                      {assn.course}
-                    </span>
-                    <h3 style={{ fontSize: '1.125rem', fontWeight: 700, marginTop: '2px' }}>{assn.title}</h3>
-                  </div>
-                  <span className="badge badge-primary">Due: {assn.dueDate}</span>
-                </div>
-
-                {assn.instructions && (
-                  <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: 0 }}>
-                    {assn.instructions}
-                  </p>
-                )}
-
-                {/* Context / Reference Materials Section */}
-                {assn.contextFiles && assn.contextFiles.length > 0 && (
-                  <div style={{ background: 'var(--bg-tertiary)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Paperclip size={14} /> Reference Materials (Context Files Attached by Teacher):
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                      {assn.contextFiles.map((file: ContextFile) => (
-                        <div
-                          key={file.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '6px 12px',
-                            background: 'var(--bg-secondary)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: 'var(--radius-md)',
-                            fontSize: '0.8125rem',
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                          }}
-                          onClick={() => alert(`Downloading ${file.name} (${file.size})`)}
-                        >
-                          {file.type === 'code' ? <FileCode size={14} style={{ color: 'var(--color-primary-500)' }} /> : <FileText size={14} style={{ color: 'var(--color-primary-500)' }} />}
-                          <span>{file.name}</span>
-                          <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)' }}>({file.size})</span>
-                          <DownloadIcon size={12} style={{ marginLeft: '4px', color: 'var(--text-tertiary)' }} />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8125rem', color: 'var(--text-tertiary)', borderTop: '1px solid var(--border-color)', paddingTop: 'var(--space-3)' }}>
-                  <div>
-                    <strong>Rubric:</strong> {assn.rubric}
-                  </div>
-                  <div>
-                    Submissions: <strong style={{ color: 'var(--text-primary)' }}>{assn.gradedSubmissions}/{assn.totalSubmissions} Graded</strong> · Max Points: <strong>{assn.maxScore}</strong>
-                  </div>
-                </div>
+      {loading ? (
+        <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          Loading live data from backend...
+        </div>
+      ) : (
+        <>
+          {/* TAB 1: Teams Assignments View */}
+          {activeTab === 'assignments' && (
+            filteredAssignments.length === 0 ? (
+              <div className="card" style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+                <ClipboardList size={36} style={{ marginBottom: 'var(--space-3)', opacity: 0.5 }} />
+                <p>No assignments found. Click "Create Assignment" to publish a new assignment.</p>
               </div>
-            ))}
-          </div>
-        )
-      )}
-
-      {/* TAB 2: Gradebook Matrix */}
-      {activeTab === 'gradebook' && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th style={{ minWidth: '200px' }}>Student</th>
-                  <th style={{ textAlign: 'center' }}>Overall Grade</th>
-                  {assignments.map((a: WebAssignment) => (
-                    <th key={a.id} style={{ textAlign: 'center' }}>
-                      <div style={{ fontWeight: 600 }}>{a.title}</div>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)' }}>
-                        Out of {a.maxScore}
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 'var(--space-6)' }}>
+                {filteredAssignments.map((assn: WebAssignment) => (
+                  <div key={assn.id} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-2)' }}>
+                        <span className="badge badge-info">{assn.course}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Due: {assn.dueDate}</span>
                       </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStudents.length === 0 ? (
-                  <tr>
-                    <td colSpan={2 + assignments.length} style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--text-tertiary)' }}>
-                      No students found in gradebook.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredStudents.map((student: Student) => {
-                    const overall = calculateOverall(student.id);
-                    return (
-                      <tr key={student.id}>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>{assn.title}</h3>
+                      <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', lineClamp: 2 }}>
+                        {assn.instructions}
+                      </p>
+
+                      {/* Attached Files Badge List */}
+                      {assn.contextFiles.length > 0 && (
+                        <div style={{ marginBottom: 'var(--space-4)' }}>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: 'var(--space-2)' }}>
+                            ATTACHED REFERENCE CONTEXT ({assn.contextFiles.length})
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+                            {assn.contextFiles.map((file: ContextFile) => (
+                              <span
+                                key={file.id}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '2px 8px',
+                                  borderRadius: 'var(--radius-sm)',
+                                  backgroundColor: 'var(--bg-tertiary)',
+                                  fontSize: '0.75rem',
+                                  color: 'var(--text-secondary)',
+                                }}
+                              >
+                                {file.type === 'code' ? <FileCode size={12} /> : <FileText size={12} />}
+                                {file.name} ({file.size})
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 'var(--space-3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                        {assn.gradedSubmissions} / {assn.totalSubmissions} Graded
+                      </span>
+                      <button className="btn btn-secondary btn-sm">View Submissions</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+
+          {/* TAB 2: Gradebook Matrix */}
+          {activeTab === 'gradebook' && (
+            students.length === 0 ? (
+              <div className="card" style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+                <Settings size={36} style={{ marginBottom: 'var(--space-3)', opacity: 0.5 }} />
+                <p>No enrolled students found for the gradebook matrix.</p>
+              </div>
+            ) : (
+              <div className="card" style={{ overflowX: 'auto' }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Student</th>
+                      {assignments.map((a: WebAssignment) => (
+                        <th key={a.id} style={{ textAlign: 'center' }}>
+                          <div>{a.title}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Max: {a.maxScore}</div>
+                        </th>
+                      ))}
+                      <th style={{ textAlign: 'right' }}>Overall Grade</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredStudents.map((s: Student) => (
+                      <tr key={s.id}>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                            <div className="avatar avatar-sm">{student.avatar}</div>
-                            <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
-                              {student.name}
-                            </span>
+                            <div className="avatar" style={{ width: '32px', height: '32px', fontSize: '0.8125rem' }}>
+                              {s.avatar}
+                            </div>
+                            <span style={{ fontWeight: 500 }}>{s.name}</span>
                           </div>
                         </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <span
-                            className={`badge ${
-                              overall >= 90 ? 'badge-success' : overall >= 70 ? 'badge-info' : 'badge-danger'
-                            }`}
-                          >
-                            {overall}%
-                          </span>
-                        </td>
                         {assignments.map((a: WebAssignment) => {
-                          const score = getStudentGrade(student.id, a.id);
+                          const score = getStudentGrade(s.id, a.id);
                           return (
-                            <td key={a.id} style={{ textAlign: 'center', padding: '0' }}>
-                              <input
-                                type="number"
-                                defaultValue={score !== null && score !== undefined ? score : ''}
-                                style={{
-                                  width: '60px',
-                                  padding: 'var(--space-2)',
-                                  background: 'transparent',
-                                  border: '1px solid transparent',
-                                  borderRadius: 'var(--radius-sm)',
-                                  color: 'var(--text-primary)',
-                                  textAlign: 'center',
-                                }}
-                                onFocus={(e) => (e.target.style.border = '1px solid var(--border-focus)')}
-                                onBlur={(e) => (e.target.style.border = '1px solid transparent')}
-                              />
+                            <td key={a.id} style={{ textAlign: 'center' }}>
+                              {score !== undefined && score !== null ? (
+                                <span style={{ fontWeight: 600 }}>{score}</span>
+                              ) : (
+                                <span style={{ color: 'var(--text-tertiary)' }}>—</span>
+                              )}
                             </td>
                           );
                         })}
+                        <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                          {calculateOverall(s.id)}%
+                        </td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+        </>
       )}
 
-      {/* New Assignment Modal Overlay */}
+      {/* Modal: Create Microsoft Teams-style Assignment */}
       {showCreateModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          backdropFilter: 'blur(4px)',
-        }}>
-          <div className="card" style={{ width: '100%', maxWidth: '580px', padding: 'var(--space-6)', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-xl)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>New Teams Assignment</h2>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              width: '100%',
+              maxWidth: '650px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: 'var(--space-6)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-6)' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Create New Teams Assignment</h2>
               <button className="btn btn-ghost btn-icon" onClick={() => setShowCreateModal(false)}>
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateAssignment} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
-                  Assignment Title
-                </label>
+            <form onSubmit={handleCreateAssignment}>
+              <div className="form-group">
+                <label className="form-label">Assignment Title</label>
                 <input
-                  type="text"
                   className="form-input"
-                  placeholder="e.g. Lab 4: Quantum Entanglement Simulation"
+                  placeholder="e.g., Problem Set 4: Binary Search Trees"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  autoFocus
                   required
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
-                    Course
-                  </label>
-                  <input
-                    type="text"
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+                <div className="form-group">
+                  <label className="form-label">Course</label>
+                  <select
                     className="form-input"
                     value={newCourse}
                     onChange={(e) => setNewCourse(e.target.value)}
-                    required
-                  />
+                  >
+                    {courses.length > 0 ? (
+                      courses.map((c: Course) => (
+                        <option key={c.id} value={c.title}>
+                          {c.title}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="CS301 Data Structures">CS301 Data Structures</option>
+                    )}
+                  </select>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
-                    Points / Max Score
-                  </label>
+                <div className="form-group">
+                  <label className="form-label">Max Score</label>
                   <input
                     type="number"
                     className="form-input"
                     value={newMaxScore}
                     onChange={(e) => setNewMaxScore(e.target.value)}
-                    required
                   />
                 </div>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
-                  Instructions
-                </label>
+              <div className="form-group">
+                <label className="form-label">Instructions</label>
                 <textarea
                   className="form-input"
-                  style={{ minHeight: '70px', resize: 'vertical' }}
-                  placeholder="Detailed instructions for students..."
+                  rows={3}
+                  placeholder="Provide detailed submission instructions..."
                   value={newInstructions}
                   onChange={(e) => setNewInstructions(e.target.value)}
                 />
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
-                  Grading Rubric
-                </label>
+              <div className="form-group">
+                <label className="form-label">Grading Rubric Criteria</label>
                 <input
-                  type="text"
                   className="form-input"
-                  placeholder="e.g. Correctness (50%), Code Quality (50%)"
                   value={newRubric}
                   onChange={(e) => setNewRubric(e.target.value)}
                 />
               </div>
 
-              {/* Context Files Attachment Section */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)', color: 'var(--color-primary-500)' }}>
-                  📎 Attach Context / Reference Files (Microsoft Teams style)
-                </label>
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="e.g. Lecture_Slides.pdf"
-                    value={newFileName}
-                    onChange={(e) => setNewFileName(e.target.value)}
-                    style={{ flex: 1 }}
-                  />
-                  <button type="button" className="btn btn-secondary" onClick={handleAddContextFile} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Paperclip size={14} /> Attach File
-                  </button>
+              {/* Context Files Attachment Section with Native File Picker */}
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
+                <label className="form-label">Attach Reference Context Files</label>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  multiple
+                  onChange={handleFileSelect}
+                />
+
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    border: '2px dashed var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: 'var(--space-6)',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    backgroundColor: 'var(--bg-tertiary)',
+                    marginBottom: 'var(--space-3)',
+                    transition: 'border-color 0.2s ease',
+                  }}
+                >
+                  <UploadCloud size={32} style={{ color: 'var(--color-primary-500)', marginBottom: 'var(--space-2)' }} />
+                  <div style={{ fontWeight: 500, fontSize: '0.9375rem' }}>
+                    {uploading ? 'Processing & Uploading Files...' : 'Click to Browse Files or Drag & Drop'}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                    Supports PDF, Word, Excel, Code files, and Images (up to 10MB)
+                  </div>
                 </div>
 
                 {attachedFiles.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                     {attachedFiles.map((file: ContextFile) => (
                       <div
                         key={file.id}
                         style={{
                           display: 'flex',
+                          justifyContent: 'space-between',
                           alignItems: 'center',
-                          gap: '6px',
-                          padding: '4px 10px',
-                          background: 'var(--bg-tertiary)',
+                          padding: 'var(--space-2) var(--space-3)',
                           borderRadius: 'var(--radius-sm)',
-                          fontSize: '0.8125rem',
-                          border: '1px solid var(--border-color)',
+                          backgroundColor: 'var(--bg-tertiary)',
+                          fontSize: '0.875rem',
                         }}
                       >
-                        <FileText size={14} style={{ color: 'var(--color-primary-500)' }} />
-                        <span>{file.name}</span>
-                        <button type="button" className="btn btn-ghost btn-icon" style={{ width: '20px', height: '20px' }} onClick={() => handleRemoveContextFile(file.id)}>
-                          <X size={12} style={{ color: 'var(--color-danger-500)' }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                          {file.type === 'code' ? <FileCode size={16} /> : <FileText size={16} />}
+                          <span>{file.name}</span>
+                          <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>({file.size})</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-icon"
+                          onClick={() => handleRemoveContextFile(file.id)}
+                        >
+                          <X size={14} />
                         </button>
                       </div>
                     ))}
@@ -487,12 +535,12 @@ export function GradebookPage() {
                 )}
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-6)' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Send size={16} /> Publish Assignment
+                <button type="submit" className="btn btn-primary" disabled={uploading}>
+                  Publish Assignment
                 </button>
               </div>
             </form>

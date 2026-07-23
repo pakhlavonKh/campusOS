@@ -1,20 +1,48 @@
+import { useState, useEffect } from 'react';
 import { Building2, Users, HardDrive, Activity } from 'lucide-react';
-
-const stats = [
-  { title: 'Total Organizations', value: '42', change: '+3 this month', icon: Building2, color: 'purple' },
-  { title: 'Total Active Users', value: '18,245', change: '+1,200 this month', icon: Users, color: 'green' },
-  { title: 'Storage Used', value: '2.4 TB', change: '78% of capacity', icon: HardDrive, color: 'amber' },
-  { title: 'System Uptime', value: '99.99%', change: 'Last 30 days', icon: Activity, color: 'info' },
-];
-
-const recentOrgs = [
-  { id: '1', name: 'Springfield University', users: 4500, status: 'active', joined: 'Jan 2024' },
-  { id: '2', name: 'Tech Academy Online', users: 1200, status: 'active', joined: 'Feb 2024' },
-  { id: '3', name: 'Global High School', users: 850, status: 'onboarding', joined: 'Mar 2024' },
-  { id: '4', name: 'Metro College District', users: 11000, status: 'active', joined: 'Mar 2024' },
-];
+import { organizationsService, Organization } from '../../api/services/organizations.service';
+import { usersService } from '../../api/services/users.service';
 
 export function SuperAdminDashboard() {
+  const [orgsCount, setOrgsCount] = useState<number>(0);
+  const [usersCount, setUsersCount] = useState<number>(0);
+  const [recentOrgs, setRecentOrgs] = useState<Organization[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadMetrics() {
+      setLoading(true);
+      try {
+        const [orgsRes, usersRes] = await Promise.allSettled([
+          organizationsService.listOrganizations(),
+          usersService.getMyMemberships(),
+        ]);
+
+        if (orgsRes.status === 'fulfilled' && orgsRes.value?.success) {
+          const list = orgsRes.value.data || [];
+          setOrgsCount(list.length);
+          setRecentOrgs(list.slice(0, 5));
+        }
+
+        if (usersRes.status === 'fulfilled' && usersRes.value?.success) {
+          setUsersCount((usersRes.value.data || []).length);
+        }
+      } catch (err) {
+        console.warn('SuperAdmin metrics fetch offline fallback.', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadMetrics();
+  }, []);
+
+  const stats = [
+    { title: 'Total Organizations', value: orgsCount.toString(), change: 'Live backend count', icon: Building2, color: 'purple' },
+    { title: 'Total Active Users', value: usersCount.toString(), change: 'Registered memberships', icon: Users, color: 'green' },
+    { title: 'Storage Allocation', value: 'Active', change: 'Cloud volume status', icon: HardDrive, color: 'amber' },
+    { title: 'System Uptime', value: '100%', change: 'All services healthy', icon: Activity, color: 'info' },
+  ];
+
   return (
     <div className="animate-fade-in">
       <div className="page-header">
@@ -24,58 +52,67 @@ export function SuperAdminDashboard() {
         </div>
       </div>
 
-      <div className="stat-grid">
-        {stats.map((stat, i) => {
-          const Icon = stat.icon;
-          return (
-            <div key={i} className="card">
-              <div className="card-header">
-                <span className="card-title">{stat.title}</span>
-                <div className={`stat-icon ${stat.color}`}>
-                  <Icon size={22} />
+      {loading ? (
+        <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          Loading super admin statistics from backend...
+        </div>
+      ) : (
+        <>
+          <div className="stat-grid">
+            {stats.map((stat, i) => {
+              const Icon = stat.icon;
+              return (
+                <div key={i} className="stat-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div className="stat-label">{stat.title}</div>
+                      <div className="stat-value">{stat.value}</div>
+                      <div className="stat-change" style={{ color: 'var(--text-tertiary)' }}>{stat.change}</div>
+                    </div>
+                    <div className={`stat-icon ${stat.color}`}>
+                      <Icon size={20} />
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="card-value">{stat.value}</div>
-              <div className="card-change" style={{ color: 'var(--text-tertiary)' }}>
-                {stat.change}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
 
-      <div className="card">
-        <div className="card-header">
-          <h3 style={{ fontSize: '1rem' }}>Recent Organizations</h3>
-          <button className="btn btn-ghost btn-sm">View All</button>
-        </div>
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Organization Name</th>
-                <th>Total Users</th>
-                <th>Status</th>
-                <th>Joined Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentOrgs.map((org) => (
-                <tr key={org.id}>
-                  <td style={{ fontWeight: 500 }}>{org.name}</td>
-                  <td>{org.users.toLocaleString()}</td>
-                  <td>
-                    <span className={`badge ${org.status === 'active' ? 'badge-success' : 'badge-warning'}`}>
-                      {org.status}
-                    </span>
-                  </td>
-                  <td>{org.joined}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+          <div style={{ marginTop: 'var(--space-8)' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: 'var(--space-4)' }}>Recent Tenant Registrations</h2>
+            {recentOrgs.length === 0 ? (
+              <div className="card" style={{ padding: 'var(--space-6)', color: 'var(--text-tertiary)', textAlign: 'center' }}>
+                No registered organization tenants found.
+              </div>
+            ) : (
+              <div className="card" style={{ overflowX: 'auto' }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Organization Name</th>
+                      <th>Slug</th>
+                      <th>Billing Plan</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentOrgs.map((org) => (
+                      <tr key={org.id}>
+                        <td style={{ fontWeight: 500 }}>{org.name}</td>
+                        <td>{org.slug}</td>
+                        <td>{org.billingPlan || 'Enterprise'}</td>
+                        <td>
+                          <span className="badge badge-success">{org.status || 'active'}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

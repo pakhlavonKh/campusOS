@@ -15,11 +15,13 @@ export interface WhiteLabelConfig {
   customBuildRef: string | null;
 }
 
-interface User {
+export interface User {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
+  role?: string;
+  roles?: string[];
 }
 
 interface AuthState {

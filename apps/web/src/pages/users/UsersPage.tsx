@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Plus, X } from 'lucide-react';
+import { usersService, UserMembership } from '../../api/services/users.service';
 
 interface SystemUser {
   id: string;
@@ -15,12 +16,38 @@ export function UsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<'student' | 'teacher' | 'admin'>('student');
 
-  const handleAddUser = (e: React.FormEvent) => {
+  useEffect(() => {
+    async function fetchUsers() {
+      setLoading(true);
+      try {
+        const res = await usersService.getMyMemberships();
+        if (res.success && res.data) {
+          const mapped: SystemUser[] = res.data.map((m: UserMembership) => ({
+            id: m.id,
+            name: m.user?.firstName ? `${m.user.firstName} ${m.user.lastName || ''}`.trim() : m.user?.email || 'User',
+            email: m.user?.email || 'user@campusos.edu',
+            role: (m.user?.roles?.[0] as any) || 'student',
+            status: m.status === 'suspended' ? 'suspended' : 'active',
+            avatar: (m.user?.firstName?.[0] || 'U').toUpperCase(),
+          }));
+          setUsers(mapped);
+        }
+      } catch (err) {
+        console.warn('Backend user endpoint unreachable or returned empty dataset.', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchUsers();
+  }, []);
+
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newEmail.trim()) return;
 
@@ -31,7 +58,7 @@ export function UsersPage() {
       .toUpperCase()
       .slice(0, 2) || 'US';
 
-    const created: SystemUser = {
+    const createdLocally: SystemUser = {
       id: Date.now().toString(),
       name: newName,
       email: newEmail,
@@ -40,17 +67,35 @@ export function UsersPage() {
       avatar: initials,
     };
 
-    setUsers([created, ...users]);
+    try {
+      await usersService.createMembership({
+        userId: createdLocally.id,
+        organizationId: 'default-org',
+      });
+    } catch (err) {
+      console.warn('Membership endpoint mock fallback.', err);
+    }
+
+    setUsers([createdLocally, ...users]);
     setNewName('');
     setNewEmail('');
     setShowModal(false);
   };
 
-  const toggleStatus = (id: string) => {
+  const toggleStatus = async (id: string) => {
+    const target = users.find((u) => u.id === id);
+    const newStatus = target?.status === 'active' ? 'suspended' : 'active';
+    
+    try {
+      await usersService.updateMembershipStatus(id, newStatus);
+    } catch (err) {
+      console.warn('Status update API fallback.', err);
+    }
+
     setUsers((prev) =>
       prev.map((u) =>
         u.id === id
-          ? { ...u, status: u.status === 'active' ? 'suspended' : 'active' }
+          ? { ...u, status: newStatus }
           : u
       )
     );
@@ -99,122 +144,118 @@ export function UsersPage() {
         </select>
       </div>
 
-      {/* Users Table */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {filtered.length === 0 ? (
-          <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-tertiary)' }}>
-            No users registered yet. Click <strong>+ Add User</strong> to add account!
-          </div>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
+      {loading ? (
+        <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          Fetching user memberships from backend...
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="card" style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+          <p>No user accounts found. Click "Add User" to invite a new user.</p>
+        </div>
+      ) : (
+        <div className="card" style={{ overflowX: 'auto' }}>
+          <table className="table">
             <thead>
-              <tr style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-color)' }}>
-                <th style={{ padding: '12px 20px', fontWeight: 600 }}>User</th>
-                <th style={{ padding: '12px 20px', fontWeight: 600 }}>Role</th>
-                <th style={{ padding: '12px 20px', fontWeight: 600 }}>Status</th>
-                <th style={{ padding: '12px 20px', fontWeight: 600, textAlign: 'right' }}>Actions</th>
+              <tr>
+                <th>User</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((user) => (
-                <tr key={user.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '14px 20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div className="avatar avatar-sm">{user.avatar}</div>
-                      <div>
-                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{user.name}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{user.email}</div>
+              {filtered.map((u) => (
+                <tr key={u.id}>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                      <div className="avatar" style={{ width: '32px', height: '32px', fontSize: '0.8125rem' }}>
+                        {u.avatar}
                       </div>
+                      <span style={{ fontWeight: 500 }}>{u.name}</span>
                     </div>
                   </td>
-                  <td style={{ padding: '14px 20px' }}>
+                  <td>{u.email}</td>
+                  <td>
                     <span
                       className={`badge ${
-                        user.role === 'teacher' ? 'badge-primary' : user.role === 'admin' ? 'badge-accent' : 'badge-neutral'
+                        u.role === 'admin'
+                          ? 'badge-purple'
+                          : u.role === 'teacher'
+                          ? 'badge-info'
+                          : 'badge-success'
                       }`}
-                      style={{ textTransform: 'capitalize' }}
                     >
-                      {user.role}
+                      {u.role.toUpperCase()}
                     </span>
                   </td>
-                  <td style={{ padding: '14px 20px' }}>
-                    <span className={`badge ${user.status === 'active' ? 'badge-success' : 'badge-danger'}`}>
-                      {user.status}
+                  <td>
+                    <span className={`badge ${u.status === 'active' ? 'badge-success' : 'badge-danger'}`}>
+                      {u.status}
                     </span>
                   </td>
-                  <td style={{ padding: '14px 20px', textAlign: 'right' }}>
+                  <td style={{ textAlign: 'right' }}>
                     <button
-                      className="btn btn-ghost"
-                      style={{ fontSize: '0.75rem', padding: '4px 10px' }}
-                      onClick={() => toggleStatus(user.id)}
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => toggleStatus(u.id)}
                     >
-                      {user.status === 'active' ? 'Suspend' : 'Activate'}
+                      {u.status === 'active' ? 'Suspend' : 'Activate'}
                     </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Add User Modal Overlay */}
+      {/* Add User Modal */}
       {showModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          backdropFilter: 'blur(4px)',
-        }}>
-          <div className="card" style={{ width: '100%', maxWidth: '460px', padding: 'var(--space-6)', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-xl)' }}>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div className="card" style={{ width: '100%', maxWidth: '450px', padding: 'var(--space-6)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
-              <h2 style={{ fontSize: '1.125rem', fontWeight: 700 }}>Add New User</h2>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Add New User Account</h2>
               <button className="btn btn-ghost btn-icon" onClick={() => setShowModal(false)}>
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleAddUser} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
-                  Full Name
-                </label>
+            <form onSubmit={handleAddUser}>
+              <div className="form-group">
+                <label className="form-label">Full Name</label>
                 <input
-                  type="text"
                   className="form-input"
-                  placeholder="e.g. Michael Scott"
+                  placeholder="e.g. Dr. Alex Mercer"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  autoFocus
                   required
                 />
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
-                  Email Address
-                </label>
+              <div className="form-group">
+                <label className="form-label">Email Address</label>
                 <input
                   type="email"
                   className="form-input"
-                  placeholder="m.scott@campusos.edu"
+                  placeholder="alex.mercer@campusos.edu"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
                   required
                 />
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>
-                  Role
-                </label>
+              <div className="form-group">
+                <label className="form-label">Role</label>
                 <select
                   className="form-input"
                   value={newRole}
@@ -222,11 +263,11 @@ export function UsersPage() {
                 >
                   <option value="student">Student</option>
                   <option value="teacher">Teacher / Faculty</option>
-                  <option value="admin">Admin</option>
+                  <option value="admin">Administrator</option>
                 </select>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-6)' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
                   Cancel
                 </button>

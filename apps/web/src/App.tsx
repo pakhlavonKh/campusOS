@@ -11,6 +11,8 @@ import { GradebookPage } from './pages/gradebook/GradebookPage';
 import { DiscussionsPage } from './pages/collaboration/DiscussionsPage';
 import { SettingsPage } from './pages/settings/SettingsPage';
 import { UsersPage } from './pages/users/UsersPage';
+import { OrganizationsPage } from './pages/admin/OrganizationsPage';
+import { SuperAdminDashboard } from './pages/admin/SuperAdminDashboard';
 import { useDesktop } from './hooks/useDesktop';
 
 // Theme Switcher for testing Tiers 1 & 2 of the Whitelabeling Architecture
@@ -91,23 +93,25 @@ function App() {
     <>
       <ThemeSwitcher />
       <Routes>
-      {/* Auth */}
-      <Route path="/login" element={<LoginPage />} />
+        {/* Auth */}
+        <Route path="/login" element={<LoginPage />} />
 
-      {/* Dashboard & App Pages */}
-      <Route element={<DashboardLayout />}>
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/courses" element={<CoursesPage />} />
-        <Route path="/attendance" element={<AttendancePage />} />
-        <Route path="/messaging" element={<MessagingPage />} />
-        <Route path="/gradebook" element={<GradebookPage />} />
-        <Route path="/discussions" element={<DiscussionsPage />} />
-        <Route path="/users" element={<UsersPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-      </Route>
+        {/* Dashboard & App Pages */}
+        <Route element={<DashboardLayout />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/admin" element={<SuperAdminDashboard />} />
+          <Route path="/organizations" element={<OrganizationsPage />} />
+          <Route path="/courses" element={<CoursesPage />} />
+          <Route path="/attendance" element={<AttendancePage />} />
+          <Route path="/messaging" element={<MessagingPage />} />
+          <Route path="/gradebook" element={<GradebookPage />} />
+          <Route path="/discussions" element={<DiscussionsPage />} />
+          <Route path="/users" element={<UsersPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Route>
 
-      {/* Default redirect */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        {/* Default redirect */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </>
   );
